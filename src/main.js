@@ -1,4 +1,4 @@
-const canvas = document.getElementById("game-canvas");
+const canvas = document.getElementById("world");
 const gl = canvas.getContext("webgl2"); // "API" web gl
 
 if (!gl) {
