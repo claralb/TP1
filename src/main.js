@@ -113,8 +113,54 @@ gl.clear(gl.COLOR_BUFFER_BIT);
 desenharRetangulo(-1.0, -1.0, 1.0, 1.0, 0.25, 0.45, 0.18);
 
 /* Caminho de terra */
-desenharRetangulo(-0.12, -1.0, 0.12, 1.0, 0.68, 0.48, 0.25);
+//desenharRetangulo(-0.12, -1.0, 0.12, 1.0, 0.68, 0.48, 0.25);
 
 /* Área inicial do galinheiro */
 desenharRetangulo(-0.25, -0.25, 0.25, 0.25, 0.75, 0.22, 0.16);
 
+/* DESENHAR CAMINHO */
+
+const waypointsEsquerda = [
+  {x:-1.0, y:0.4},
+  {x:-0.6, y:0.4},
+  {x:-0.6, y:0.0},
+  {x:-0.2, y:0.0},
+  {x:0.0, y:0.0}
+]
+
+ const waypointsDireita = [
+  {x:1.0, y:-0.4},
+  {x:0.6, y:-0.4},
+  {x:0.6, y:0.0},
+  {x:0.2, y:0.0},
+  {x:0.0, y:0.0}
+ ]
+
+function desenharCaminho (waypoints){
+  for (let i = 0; i<waypoints.length - 1; i++){
+    const atual = waypoints[i];
+    const proximo =  waypoints[i+1];
+
+    const ehHorizontal = atual.y === proximo.y; //se os dois y sao iguais continua no horizontal
+
+    const espessura = 0.06;
+
+    if (ehHorizontal) {
+    const x1 = Math.min(atual.x, proximo.x);
+    const x2 = Math.max(atual.x, proximo.x);
+    const y1 = atual.y - espessura;
+    const y2 = atual.y + espessura;
+    desenharRetangulo(x1, y1, x2, y2, 0.68, 0.48, 0.25);
+      } 
+      else {
+    const y1 = Math.min(atual.y, proximo.y);
+    const y2 = Math.max(atual.y, proximo.y);
+    const x1 = atual.x - espessura;
+    const x2 = atual.x + espessura;
+    desenharRetangulo(x1, y1, x2, y2, 0.68, 0.48, 0.25);
+      } 
+  }
+}
+
+desenharCaminho(waypointsEsquerda);
+desenharCaminho(waypointsDireita);
