@@ -13,6 +13,7 @@ gl.viewport(0, 0, canvas.width, canvas.height);
 
 const vertexShaderSource = `#version 300 es
 in vec2 aPosition;
+in vec2 aTexCoord; //
 
 void main() {
   gl_Position = vec4(aPosition, 0.0, 1.0);
@@ -117,6 +118,33 @@ desenharRetangulo(-1.0, -1.0, 1.0, 1.0, 0.25, 0.45, 0.18);
 
 /* Área inicial do galinheiro */
 desenharRetangulo(-0.25, -0.25, 0.25, 0.25, 0.75, 0.22, 0.16);
+
+/* SEGMENTOS AINDA EM ALTERAÇÃO
+
+function desenharSegmento (x1, y1, x2, y2, espessura, r, g, b){
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+
+  //normaliza
+
+  const tamanho = Math.sqrt(dx * dx + dy*dy);
+  const dxNorm = dx / tamanho;
+  const dyNorm = dy / tamanho;
+
+  const perpX = -dyNorm;
+  const perpY = dxNorm;
+
+  const ax1 = x1 + perpX * espessura;
+  const ay1 = y1 + perpY * espessura;
+  const ax2 = x1 - perpX * espessura;
+  const ay2 = y1 - perpY * espessura;
+  const bx1 = x2 + perpX * espessura;
+  const by1 = y2 + perpY * espessura;
+  const bx2 = x2 - perpX * espessura;
+  const by2 = y2 - perpY * espessura;
+
+}
+ */
 
 /* DESENHAR CAMINHO */
 
