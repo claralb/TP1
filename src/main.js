@@ -113,11 +113,13 @@ gl.clear(gl.COLOR_BUFFER_BIT);
 /* Gramado */
 desenharRetangulo(-1.0, -1.0, 1.0, 1.0, 0.25, 0.45, 0.18);
 
+/* Área inicial do galinheiro */
+desenharRetangulo(-0.25, -0.25, 0.25, 0.25, 0.75, 0.22, 0.16);
+
 /* Caminho de terra */
 //desenharRetangulo(-0.12, -1.0, 0.12, 1.0, 0.68, 0.48, 0.25);
 
-/* Área inicial do galinheiro */
-desenharRetangulo(-0.25, -0.25, 0.25, 0.25, 0.75, 0.22, 0.16);
+
 
 /* SEGMENTOS AINDA EM ALTERAÇÃO
 
