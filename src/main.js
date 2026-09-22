@@ -10,7 +10,8 @@ if (!gl) {
 }
 
 gl.viewport(0, 0, canvas.width, canvas.height);
-
+gl.enable(gl.BLEND);
+gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
 // vertex Shader
 const vertexShaderSource = `#version 300 es
@@ -31,12 +32,20 @@ precision highp float;
 uniform sampler2D u_textura;
 uniform vec4 u_cor;
 uniform bool u_usaTextura;
+uniform bool u_removeFundo;
 in vec2 v_texCoord;
 out vec4 o_cor;
 
 void main() {
   if (u_usaTextura) {
-    o_cor = texture(u_textura, v_texCoord);
+    vec4 corTextura = texture(u_textura, v_texCoord);
+    vec3 corFundoPedras = vec3(228.0 / 255.0, 166.0 / 255.0, 114.0 / 255.0);
+
+    if (u_removeFundo && distance(corTextura.rgb, corFundoPedras) < 0.01) {
+      discard;
+    }
+
+    o_cor = corTextura;
   } else {
     o_cor = u_cor;
   }
@@ -83,6 +92,7 @@ const texCoord = gl.getAttribLocation(programa, "a_texCoord");
 const cor = gl.getUniformLocation(programa, "u_cor");
 const usaTextura = gl.getUniformLocation(programa, "u_usaTextura"); 
 const textura = gl.getUniformLocation(programa, "u_textura");  
+const removeFundo = gl.getUniformLocation(programa, "u_removeFundo");
 
 const buffer = gl.createBuffer();
 
@@ -93,28 +103,100 @@ if (!buffer) {
 gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
 
 //CARREGA UMA TEXTURA
-function carregarTextura(caminho) {
+function carregarTextura(caminho, repetir = false) {
   const texturaWebGL = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, texturaWebGL);
 
-  const imagem = new Image();
-  imagem.onload = function () {
-  gl.bindTexture(gl.TEXTURE_2D, texturaWebGL);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, imagem);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
-  gl.generateMipmap(gl.TEXTURE_2D);
-  renderizar();
-};
-  imagem.src = caminho;
+  gl.texImage2D(
+    gl.TEXTURE_2D,
+    0,
+    gl.RGBA,
+    1,
+    1,
+    0,
+    gl.RGBA,
+    gl.UNSIGNED_BYTE,
+    new Uint8Array([255, 255, 255, 0])
+  );
 
+  const imagem = new Image();
+
+  imagem.onload = function () {
+    gl.bindTexture(gl.TEXTURE_2D, texturaWebGL);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+
+    gl.texImage2D(
+      gl.TEXTURE_2D,
+      0,
+      gl.RGBA,
+      gl.RGBA,
+      gl.UNSIGNED_BYTE,
+      imagem
+    );
+
+    gl.texParameteri(
+      gl.TEXTURE_2D,
+      gl.TEXTURE_MIN_FILTER,
+      gl.NEAREST
+    );
+
+    gl.texParameteri(
+      gl.TEXTURE_2D,
+      gl.TEXTURE_MAG_FILTER,
+      gl.NEAREST
+    );
+
+    const modo = repetir ? gl.REPEAT : gl.CLAMP_TO_EDGE;
+
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, modo);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, modo);
+
+    renderizar();
+  };
+
+  imagem.src = caminho;
   return texturaWebGL;
 }
 
+// function carregarTextura(caminho) {
+//   const texturaWebGL = gl.createTexture();
+//   gl.bindTexture(gl.TEXTURE_2D, texturaWebGL);
+
+//   const imagem = new Image();
+//   imagem.onload = function () {
+//   gl.bindTexture(gl.TEXTURE_2D, texturaWebGL);
+//   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, imagem);
+//   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+//   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+//   gl.generateMipmap(gl.TEXTURE_2D);
+//   renderizar();
+// };
+//   imagem.src = caminho;
+
+//   return texturaWebGL;
+// }
+
+
+
 //adiciona grama
 const texturaGramaClara = carregarTextura("assets/img/grassPix.jpg");
-const texturaGramaEscura = carregarTextura("assets/img/Grass_Middle.png");
 
+const texturaFazenda = carregarTextura(
+  "assets/img/FarmLand_Tile.png"
+);
+
+const texturaGalinheiro = carregarTextura(
+  "assets/img/Galinheiro.png"
+);
+
+const texturaCaminho = carregarTextura(
+  "assets/img/Path_Middle.png",
+  true
+);
+
+const texturaEnfeites = carregarTextura(
+  "assets/img/Path_Tile.png"
+);
 
 function desenharRetangulo(x1, y1, x2, y2, r, g, b, a = 1.0) {
   const vertices = new Float32Array([
@@ -130,20 +212,234 @@ function desenharRetangulo(x1, y1, x2, y2, r, g, b, a = 1.0) {
 
   gl.uniform4f(cor, r, g, b, a);
   gl.uniform1i(usaTextura, 0);
+  gl.uniform1i(removeFundo, 0);
+  gl.disableVertexAttribArray(texCoord);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
 
-function desenharRetanguloTexturizado(x1, y1, x2, y2, texturaWebGL) {
+function desenharRetanguloTexturizado(
+  x1,
+  y1,
+  x2,
+  y2,
+  texturaWebGL,
+  u1 = 0,
+  v1 = 0,
+  u2 = 1,
+  v2 = 1,
+  removerFundo = false
+) {
   const vertices = new Float32Array([
-    x1, y1, 0, 0,
-    x2, y1, 1, 0,
-    x1, y2, 0, 1,
+    x1, y1, u1, v1,
+    x2, y1, u2, v1,
+    x1, y2, u1, v2,
 
-    x1, y2, 0, 1,
-    x2, y1, 1, 0,
-    x2, y2, 1, 1,
+    x1, y2, u1, v2,
+    x2, y1, u2, v1,
+    x2, y2, u2, v2,
   ]);
 
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+  gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+
+  gl.useProgram(programa);
+
+  gl.enableVertexAttribArray(posicao);
+  gl.vertexAttribPointer(
+    posicao,
+    2,
+    gl.FLOAT,
+    false,
+    16,
+    0
+  );
+
+  gl.enableVertexAttribArray(texCoord);
+  gl.vertexAttribPointer(
+    texCoord,
+    2,
+    gl.FLOAT,
+    false,
+    16,
+    8
+  );
+
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, texturaWebGL);
+
+  gl.uniform1i(textura, 0);
+  gl.uniform1i(usaTextura, 1);
+  gl.uniform1i(removeFundo, removerFundo ? 1 : 0);
+
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+}
+
+
+/* DESENHAR CAMINHO */
+
+const waypointsEsquerda = [
+  { x: -1.0, y: 0.4 },
+  { x: -0.7, y: 0.4 },
+  { x: -0.5, y: 0.0 },
+  { x: 0.0, y: 0.0 },
+];
+
+const waypointsDireita = [
+  { x: 1.0, y: -0.4 },
+  { x: 0.7, y: -0.4 },
+  { x: 0.5, y: 0.0 },
+  { x: 0.0, y: 0.0 },
+];
+
+function suavizarCaminho(waypoints, raioPixels = 55, subdivisoes = 10) {
+  const paraPixels = (ponto) => ({
+    x: ponto.x * canvas.width / 2,
+    y: ponto.y * canvas.height / 2,
+  });
+
+  const paraWebGL = (ponto) => ({
+    x: ponto.x * 2 / canvas.width,
+    y: ponto.y * 2 / canvas.height,
+  });
+
+  const pontosPixels = waypoints.map(paraPixels);
+  const pontosSuavizados = [waypoints[0]];
+
+  for (let i = 1; i < pontosPixels.length - 1; i++) {
+    const anterior = pontosPixels[i - 1];
+    const curva = pontosPixels[i];
+    const proximo = pontosPixels[i + 1];
+
+    const entradaX = curva.x - anterior.x;
+    const entradaY = curva.y - anterior.y;
+    const saidaX = proximo.x - curva.x;
+    const saidaY = proximo.y - curva.y;
+    const tamanhoEntrada = Math.hypot(entradaX, entradaY);
+    const tamanhoSaida = Math.hypot(saidaX, saidaY);
+
+    const raio = Math.min(
+      raioPixels,
+      tamanhoEntrada * 0.35,
+      tamanhoSaida * 0.35
+    );
+
+    const antes = {
+      x: curva.x - entradaX / tamanhoEntrada * raio,
+      y: curva.y - entradaY / tamanhoEntrada * raio,
+    };
+
+    const depois = {
+      x: curva.x + saidaX / tamanhoSaida * raio,
+      y: curva.y + saidaY / tamanhoSaida * raio,
+    };
+
+    pontosSuavizados.push(paraWebGL(antes));
+
+    // Curva quadrática: antes -> ponto da curva -> depois.
+    for (let passo = 1; passo <= subdivisoes; passo++) {
+      const t = passo / subdivisoes;
+      const inverso = 1 - t;
+
+      pontosSuavizados.push(paraWebGL({
+        x: inverso * inverso * antes.x +
+          2 * inverso * t * curva.x +
+          t * t * depois.x,
+        y: inverso * inverso * antes.y +
+          2 * inverso * t * curva.y +
+          t * t * depois.y,
+      }));
+    }
+  }
+
+  pontosSuavizados.push(waypoints[waypoints.length - 1]);
+  return pontosSuavizados;
+}
+
+function desenharCaminho(waypoints) {
+  const pontos = suavizarCaminho(waypoints);
+  const espessura = 0.06;
+  const meiaLarguraPixels = espessura * canvas.height / 2;
+  const tamanhoTilePixels = espessura * canvas.height;
+  const normais = [];
+  const comprimentos = [];
+
+  // Calcula a direção e a normal de cada trecho em coordenadas de tela.
+  for (let i = 0; i < pontos.length - 1; i++) {
+    const dx = (pontos[i + 1].x - pontos[i].x) * canvas.width / 2;
+    const dy = (pontos[i + 1].y - pontos[i].y) * canvas.height / 2;
+    const comprimento = Math.hypot(dx, dy);
+
+    normais.push({ x: -dy / comprimento, y: dx / comprimento });
+    comprimentos.push(comprimento);
+  }
+
+  // Calcula uma única borda para cada ponto, criando junções diagonais
+  // limpas em vez de sobrepor retângulos com pontas sobrando.
+  const offsets = pontos.map((_, i) => {
+    if (i === 0) {
+      return {
+        x: normais[0].x * meiaLarguraPixels,
+        y: normais[0].y * meiaLarguraPixels,
+      };
+    }
+
+    if (i === pontos.length - 1) {
+      const normal = normais[normais.length - 1];
+      return {
+        x: normal.x * meiaLarguraPixels,
+        y: normal.y * meiaLarguraPixels,
+      };
+    }
+
+    const normalAnterior = normais[i - 1];
+    const proximaNormal = normais[i];
+    const somaX = normalAnterior.x + proximaNormal.x;
+    const somaY = normalAnterior.y + proximaNormal.y;
+    const tamanhoSoma = Math.hypot(somaX, somaY);
+    const miterX = somaX / tamanhoSoma;
+    const miterY = somaY / tamanhoSoma;
+    const escala = meiaLarguraPixels /
+      (miterX * proximaNormal.x + miterY * proximaNormal.y);
+
+    return { x: miterX * escala, y: miterY * escala };
+  });
+
+  const dadosVertices = [];
+  let distanciaAcumulada = 0;
+
+  for (let i = 0; i < pontos.length - 1; i++) {
+    const inicio = pontos[i];
+    const fim = pontos[i + 1];
+    const offsetInicio = offsets[i];
+    const offsetFim = offsets[i + 1];
+    const uInicio = distanciaAcumulada / tamanhoTilePixels;
+    const uFim = (distanciaAcumulada + comprimentos[i]) / tamanhoTilePixels;
+
+    const inicioMenosX = inicio.x - offsetInicio.x * 2 / canvas.width;
+    const inicioMenosY = inicio.y - offsetInicio.y * 2 / canvas.height;
+    const inicioMaisX = inicio.x + offsetInicio.x * 2 / canvas.width;
+    const inicioMaisY = inicio.y + offsetInicio.y * 2 / canvas.height;
+    const fimMenosX = fim.x - offsetFim.x * 2 / canvas.width;
+    const fimMenosY = fim.y - offsetFim.y * 2 / canvas.height;
+    const fimMaisX = fim.x + offsetFim.x * 2 / canvas.width;
+    const fimMaisY = fim.y + offsetFim.y * 2 / canvas.height;
+
+    dadosVertices.push(
+      inicioMenosX, inicioMenosY, uInicio, 0,
+      fimMenosX, fimMenosY, uFim, 0,
+      inicioMaisX, inicioMaisY, uInicio, 1,
+
+      inicioMaisX, inicioMaisY, uInicio, 1,
+      fimMenosX, fimMenosY, uFim, 0,
+      fimMaisX, fimMaisY, uFim, 1
+    );
+
+    distanciaAcumulada += comprimentos[i];
+  }
+
+  const vertices = new Float32Array(dadosVertices);
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
   gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
   gl.useProgram(programa);
 
@@ -154,56 +450,49 @@ function desenharRetanguloTexturizado(x1, y1, x2, y2, texturaWebGL) {
   gl.vertexAttribPointer(texCoord, 2, gl.FLOAT, false, 16, 8);
 
   gl.activeTexture(gl.TEXTURE0);
-  gl.bindTexture(gl.TEXTURE_2D, texturaWebGL);
+  gl.bindTexture(gl.TEXTURE_2D, texturaCaminho);
   gl.uniform1i(textura, 0);
   gl.uniform1i(usaTextura, 1);
-
-  gl.drawArrays(gl.TRIANGLES, 0, 6);
+  gl.uniform1i(removeFundo, 0);
+  gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 4);
 }
+function desenharRecorteAtlas(
+  x1,
+  y1,
+  x2,
+  y2,
+  pixelX,
+  pixelY,
+  largura,
+  altura
+) {
+  const atlasLargura = 48;
+  const atlasAltura = 96;
 
-/* DESENHAR CAMINHO */
+  const u1 = (pixelX + 0.5) / atlasLargura;
+  const u2 = (pixelX + largura - 0.5) / atlasLargura;
 
-const waypointsEsquerda = [
-  { x: -1.0, y: 0.4 },
-  { x: -0.6, y: 0.4 },
-  { x: -0.6, y: 0.0 },
-  { x: -0.2, y: 0.0 },
-  { x: 0.0, y: 0.0 },
-];
+  const v1 =
+    (atlasAltura - (pixelY + altura) + 0.5) /
+    atlasAltura;
 
-const waypointsDireita = [
-  { x: 1.0, y: -0.4 },
-  { x: 0.6, y: -0.4 },
-  { x: 0.6, y: 0.0 },
-  { x: 0.2, y: 0.0 },
-  { x: 0.0, y: 0.0 },
-];
+  const v2 =
+    (atlasAltura - pixelY - 0.5) /
+    atlasAltura;
 
-function desenharCaminho(waypoints) {
-  for (let i = 0; i < waypoints.length - 1; i++) {
-    const atual = waypoints[i];
-    const proximo = waypoints[i + 1];
-
-    const ehHorizontal = atual.y === proximo.y; //se os dois y sao iguais continua no horizontal
-
-    const espessura = 0.06;
-
-    if (ehHorizontal) {
-      const x1 = Math.min(atual.x, proximo.x);
-      const x2 = Math.max(atual.x, proximo.x);
-      const y1 = atual.y - espessura;
-      const y2 = atual.y + espessura;
-      desenharRetangulo(x1, y1, x2, y2, 0.68, 0.48, 0.25);
-    } else {
-      const y1 = Math.min(atual.y, proximo.y);
-      const y2 = Math.max(atual.y, proximo.y);
-      const x1 = atual.x - espessura;
-      const x2 = atual.x + espessura;
-      desenharRetangulo(x1, y1, x2, y2, 0.68, 0.48, 0.25);
-    }
-  }
+  desenharRetanguloTexturizado(
+    x1,
+    y1,
+    x2,
+    y2,
+    texturaEnfeites,
+    u1,
+    v1,
+    u2,
+    v2,
+    true
+  );
 }
-
 //   // Preenche o chão com tijolos até o final do canvas
 // percorrer todo o desenhar caminho com tijolos
 //   for (let y = FLOOR_Y + 57; y < canvas.height + 32; y += 64) {
@@ -221,14 +510,61 @@ function renderizar() {
   gl.clearColor(0.08, 0.14, 0.08, 1.0);
   gl.clear(gl.COLOR_BUFFER_BIT);
 
-  // Preenche a tela inteira com a textura:
-  // x1 = -1.0 (esquerda), y1 = -1.0 (baixo), x2 = 1.0 (direita), y2 = 1.0 (cima)
-  desenharRetanguloTexturizado(-1.0, -1.0, 1.0, 1.0, texturaGramaClara);
+    // Fundo de grama
+  desenharRetanguloTexturizado(
+    -1.0,
+    -1.0,
+    1.0,
+    1.0,
+    texturaGramaClara
+  );
 
+  // Caminhos com Path_Middle.png
   desenharCaminho(waypointsEsquerda);
   desenharCaminho(waypointsDireita);
 
-  desenharRetangulo(-0.25, -0.25, 0.25, 0.25, 0.75, 0.22, 0.16);
+  // Área central com FarmLand_Tile.png
+  desenharRetanguloTexturizado(
+    -0.25,
+    -0.25,
+    0.25,
+    0.25,
+    texturaFazenda
+  );
+
+  // Galinheiro sobre a área central. As proporções compensam o canvas
+  // retangular para que o sprite quadrado não fique achatado.
+  desenharRetanguloTexturizado(
+    -0.18,
+    -0.22,
+    0.18,
+    0.42,
+    texturaGalinheiro
+  );
+
+  // Pedras no caminho esquerdo
+  desenharRecorteAtlas(
+    -0.90,
+    0.36,
+    -0.66,
+    0.44,
+    0,
+    80,
+    48,
+    16
+  );
+
+  // Pedras no caminho direito
+  desenharRecorteAtlas(
+    0.66,
+    -0.44,
+    0.90,
+    -0.36,
+    0,
+    80,
+    48,
+    16
+  );
 }
 
 renderizar();
