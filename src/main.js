@@ -3,6 +3,136 @@ const canvas = document.getElementById("world");
 if (!canvas) {
   throw new Error("Canvas não encontrado");
 }
+
+const menuPrincipal = document.getElementById("main-menu");
+const menuCreditos = document.getElementById("credits-menu");
+const menuConfiguracoes = document.getElementById("settings-menu");
+const botaoIniciar = document.getElementById("start-game");
+const botaoSair = document.getElementById("exit-game");
+const controleMusica = document.getElementById("music-enabled");
+const controleVolume = document.getElementById("music-volume");
+const statusMusica = document.getElementById("music-status");
+const valorVolume = document.getElementById("volume-value");
+let jogoIniciado = false;
+
+let audioContexto = null;
+let ganhoMusica = null;
+let timerMusica = null;
+let passoMusica = 0;
+let musicaLigada = true;
+let volumeMusica = 0.45;
+
+try {
+  const preferencias = JSON.parse(localStorage.getItem("galinhas-config") || "{}");
+  musicaLigada = preferencias.musicaLigada ?? true;
+  volumeMusica = preferencias.volume ?? 0.45;
+} catch {}
+
+controleMusica.checked = musicaLigada;
+controleVolume.value = String(Math.round(volumeMusica * 100));
+
+function salvarConfiguracoes() {
+  try {
+    localStorage.setItem("galinhas-config", JSON.stringify({ musicaLigada, volume: volumeMusica }));
+  } catch {}
+}
+
+function atualizarControlesMusica() {
+  statusMusica.textContent = musicaLigada ? "Ligada" : "Muda";
+  valorVolume.textContent = `${Math.round(volumeMusica * 100)}%`;
+  controleVolume.disabled = !musicaLigada;
+  if (ganhoMusica) {
+    ganhoMusica.gain.setTargetAtTime(musicaLigada ? volumeMusica * 0.12 : 0, audioContexto.currentTime, 0.04);
+  }
+}
+
+function tocarNota(frequencia, duracao = 0.18) {
+  if (!audioContexto || !ganhoMusica || !musicaLigada) return;
+  const oscilador = audioContexto.createOscillator();
+  const ganhoNota = audioContexto.createGain();
+  oscilador.type = "square";
+  oscilador.frequency.value = frequencia;
+  ganhoNota.gain.setValueAtTime(0.0001, audioContexto.currentTime);
+  ganhoNota.gain.exponentialRampToValueAtTime(0.32, audioContexto.currentTime + 0.015);
+  ganhoNota.gain.exponentialRampToValueAtTime(0.0001, audioContexto.currentTime + duracao);
+  oscilador.connect(ganhoNota).connect(ganhoMusica);
+  oscilador.start();
+  oscilador.stop(audioContexto.currentTime + duracao + 0.02);
+}
+
+function iniciarMusica() {
+  if (!audioContexto) {
+    audioContexto = new AudioContext();
+    ganhoMusica = audioContexto.createGain();
+    ganhoMusica.connect(audioContexto.destination);
+  }
+  audioContexto.resume();
+  atualizarControlesMusica();
+  if (timerMusica) return;
+  const melodia = [261.63, 329.63, 392.0, 329.63, 293.66, 349.23, 440.0, 349.23];
+  timerMusica = setInterval(() => {
+    tocarNota(melodia[passoMusica % melodia.length]);
+    passoMusica++;
+  }, 380);
+}
+
+function abrirMenu(menu) {
+  menuPrincipal.classList.add("is-hidden");
+  menuCreditos.classList.toggle("is-hidden", menu !== "credits");
+  menuConfiguracoes.classList.toggle("is-hidden", menu !== "settings");
+}
+
+function voltarAoMenuPrincipal() {
+  menuCreditos.classList.add("is-hidden");
+  menuConfiguracoes.classList.add("is-hidden");
+  menuPrincipal.classList.remove("is-hidden");
+  botaoIniciar.focus();
+}
+
+function mostrarJogo() {
+  iniciarMusica();
+  jogoIniciado = true;
+  canvas.classList.remove("is-blurred");
+  menuPrincipal.classList.add("is-hidden");
+  menuCreditos.classList.add("is-hidden");
+  menuConfiguracoes.classList.add("is-hidden");
+  botaoSair.hidden = false;
+}
+
+function mostrarMenu() {
+  jogoIniciado = false;
+  canvas.classList.add("is-blurred");
+  voltarAoMenuPrincipal();
+  botaoSair.hidden = true;
+}
+
+botaoIniciar.addEventListener("click", mostrarJogo);
+botaoSair.addEventListener("click", mostrarMenu);
+document.querySelectorAll("[data-open-menu]").forEach((botao) => {
+  botao.addEventListener("click", () => {
+    iniciarMusica();
+    abrirMenu(botao.dataset.openMenu);
+  });
+});
+document.querySelectorAll("[data-back-menu]").forEach((botao) => {
+  botao.addEventListener("click", voltarAoMenuPrincipal);
+});
+
+controleMusica.addEventListener("change", () => {
+  musicaLigada = controleMusica.checked;
+  if (musicaLigada) iniciarMusica();
+  atualizarControlesMusica();
+  salvarConfiguracoes();
+});
+
+controleVolume.addEventListener("input", () => {
+  volumeMusica = Number(controleVolume.value) / 100;
+  atualizarControlesMusica();
+  salvarConfiguracoes();
+});
+
+atualizarControlesMusica();
+
 const gl = canvas.getContext("webgl2"); // "API" web gl
 
 if (!gl) {
@@ -657,8 +787,7 @@ function renderizar() {
   desenharRaposaAnimada(raposa);
   desenharRaposaAnimada(raposaDireita);
 
-  // Galinheiro sobre a área central. As proporções compensam o canvas
-  // retangular para que o sprite quadrado não fique achatado.
+
   desenharRetanguloTexturizado(
     -0.18,
     -0.22,
@@ -679,8 +808,10 @@ function loop(tempoAtual) {
   const deltaTempo = (tempoAtual - tempoAnterior) / 1000 || 0;
   tempoAnterior = tempoAtual;
 
-  atualizarRaposaAnimada(raposa, rotaEsquerda, deltaTempo);
-  atualizarRaposaAnimada(raposaDireita, rotaDireita, deltaTempo);
+  if (jogoIniciado) {
+    atualizarRaposaAnimada(raposa, rotaEsquerda, deltaTempo);
+    atualizarRaposaAnimada(raposaDireita, rotaDireita, deltaTempo);
+  }
   renderizar();
 
   requestAnimationFrame(loop);

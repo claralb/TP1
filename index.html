@@ -7,11 +7,64 @@
     <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-     <main id="game">
-    <canvas id="world" width="1280" height="720"
-        aria-label="Área principal do jogo Galinhas vs Raposas"
+    <main id="game">
+        <canvas
+            id="world"
+            class="is-blurred"
+            width="1280"
+            height="720"
+            aria-label="Área principal do jogo Galinhas vs Raposas"
         ></canvas>
-            </main> 
+
+        <section id="main-menu" aria-labelledby="game-title">
+            <div class="menu-card">
+                <h1 id="game-title">Galinhas<br><strong>vs Raposas</strong></h1>
+                <p>Proteja o galinheiro e impeça que as raposas cheguem ao centro da fazenda.</p>
+                <div class="menu-actions">
+                    <button id="start-game" class="primary-action" type="button">Iniciar jogo</button>
+                    <button type="button" data-open-menu="settings">Configurações</button>
+                    <button type="button" data-open-menu="credits">Créditos</button>
+                </div>
+            </div>
+        </section>
+
+        <section id="credits-menu" class="secondary-menu is-hidden" aria-labelledby="credits-title">
+            <div class="menu-card compact-card">
+                <span class="menu-kicker">Quem fez o jogo</span>
+                <h2 id="credits-title">Créditos</h2>
+                <div class="credits-list">
+                    <p>Caroline Elizabeth Leroy Alves</p>
+                    <span aria-hidden="true">&amp;</span>
+                    <p>Clara Liberal Barbi</p>
+                </div>
+                <button type="button" data-back-menu>Voltar</button>
+            </div>
+        </section>
+
+        <section id="settings-menu" class="secondary-menu is-hidden" aria-labelledby="settings-title">
+            <div class="menu-card compact-card">
+                <h2 id="settings-title">Configurações</h2>
+                <div class="settings-list">
+                    <label class="toggle-row" for="music-enabled">
+                        <span>Música</span>
+                        <input id="music-enabled" type="checkbox" checked>
+                        <span class="pixel-toggle" aria-hidden="true"></span>
+                        <strong id="music-status">Ligada</strong>
+                    </label>
+                    <label class="volume-row" for="music-volume">
+                        <span>Volume</span>
+                        <input id="music-volume" type="range" min="0" max="100" step="5" value="45">
+                        <output id="volume-value" for="music-volume">45%</output>
+                    </label>
+                </div>
+                <button type="button" data-back-menu>Voltar</button>
+            </div>
+        </section>
+
+        <button id="exit-game" type="button" aria-label="Sair para o menu principal" title="Sair para o menu" hidden>
+            <span class="sr-only">Sair</span>
+        </button>
+    </main>
     <script src="./src/main.js"></script>
 </body>
 </html>
