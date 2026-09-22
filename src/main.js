@@ -1,3 +1,4 @@
+// CONFIGURAÇÕES INICIAIS CANVAS E WEBGL2
 const canvas = document.getElementById("world");
 if (!canvas) {
   throw new Error("Canvas não encontrado");
@@ -13,7 +14,9 @@ gl.viewport(0, 0, canvas.width, canvas.height);
 gl.enable(gl.BLEND);
 gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
-// vertex Shader
+// -------------------------------------------------------------------
+// SHADERS: VERTEX E FRAGMENT
+
 const vertexShaderSource = `#version 300 es
 in vec2 a_coord;
 in vec2 a_texCoord;
@@ -25,7 +28,6 @@ void main() {
 }
 `;
 
-// Fragment Shader
 const fragmentShaderSource = `#version 300 es
 precision highp float;
 
@@ -83,6 +85,9 @@ function criarPrograma(vertexShader, fragmentShader) {
   return programa;
 }
 
+// -------------------------------------------------------------
+// COMPILAÇÃO DOS SHADERS
+
 const vertexShader = criarShader(gl.VERTEX_SHADER, vertexShaderSource);
 const fragmentShader = criarShader(gl.FRAGMENT_SHADER, fragmentShaderSource);
 const programa = criarPrograma(vertexShader, fragmentShader);
@@ -102,10 +107,11 @@ if (!buffer) {
 
 gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
 
+// -----------------------------------------------------------------------------------------------------------
 //CARREGA UMA TEXTURA
 function carregarTextura(caminho, repetir = false) {
   const texturaWebGL = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, texturaWebGL);
+  gl.bindTexture(gl.TEXTURE_2D, texturaWebGL); 
 
   gl.texImage2D(
     gl.TEXTURE_2D,
@@ -162,8 +168,9 @@ function carregarTextura(caminho, repetir = false) {
 // }
 
 
+// ------------------------------------------------------------------------
+// TEXTURAS DA CENA
 
-//adiciona grama
 const texturaGramaClara = carregarTextura("assets/img/grassPixel.jpg");
 
 const texturaFazenda = carregarTextura(
@@ -182,6 +189,12 @@ const texturaCaminho = carregarTextura(
 const texturaEnfeites = carregarTextura(
   "assets/img/Path_Tile.png"
 );
+
+//RAPOSA SPRING SHEET
+const texturaRaposa = carregarTextura("assets/img/fox.png");
+
+// -----------------------------------------------------
+//FUNÇÕES DO DESENHO BÁSICO
 
 function desenharRetangulo(x1, y1, x2, y2, r, g, b, a = 1.0) {
   const vertices = new Float32Array([
@@ -259,8 +272,8 @@ function desenharRetanguloTexturizado(
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
 
-
-/* DESENHAR CAMINHO */
+//------------------------------------------------------------------------------
+// DESENHAR CAMINHO 
 
 const waypointsEsquerda = [
   { x: -1.0, y: 0.4 },
@@ -488,8 +501,87 @@ function desenharRecorteAtlas(
 //     }
 //   }
 
-/* Área inicial do galinheiro */
-//desenharRetangulo(-0.25, -0.25, 0.25, 0.25, 0.75, 0.22, 0.16);
+const rotaEsquerda = suavizarCaminho(waypointsEsquerda);
+
+const configSpriteRaposa = { larguraSheet: 448,  alturaSheet: 270,  larguraFrame: 32, alturaFrame: 32, linhaAnimacao: 3, totalFrames: 8, fpsAnimacao: 10};
+
+const raposa = {indicePonto: 0, progresso: 0, velocidade: 0.10,
+  x: waypointsEsquerda[0].x,
+  y: waypointsEsquerda[0].y,
+  tamanhoY: 0.20, //define o tamanho da raposa em relação ao canvas
+  tempoAnimacao: 0,
+  frameAtual: 0
+};
+
+//move para cada frame
+function atualizarRaposa(deltaTempo) {
+  raposa.tempoAnimacao += deltaTempo;
+  const frameCalculado = Math.floor(raposa.tempoAnimacao * configSpriteRaposa.fpsAnimacao);
+  raposa.frameAtual = frameCalculado % configSpriteRaposa.totalFrames;
+
+  if (raposa.indicePonto >= rotaEsquerda.length - 1) {
+    raposa.indicePonto = 0;
+    raposa.progresso = 0;
+  }
+
+  const pAtual = rotaEsquerda[raposa.indicePonto];
+  const pProx = rotaEsquerda[raposa.indicePonto + 1];
+
+  const dx = pProx.x - pAtual.x;
+  const dy = pProx.y - pAtual.y;
+  const dist = Math.hypot(dx, dy);
+
+  if (dist > 0) {
+    raposa.progresso += (raposa.velocidade * deltaTempo) / dist;
+  } else {
+    raposa.progresso = 1.0;
+  }
+
+  while (raposa.progresso >= 1.0 && raposa.indicePonto < rotaEsquerda.length - 1) {
+    raposa.progresso -= 1.0;
+    raposa.indicePonto++;
+  }
+
+  if (raposa.indicePonto < rotaEsquerda.length - 1) {
+    const p1 = rotaEsquerda[raposa.indicePonto];
+    const p2 = rotaEsquerda[raposa.indicePonto + 1];
+
+    raposa.x = p1.x + (p2.x - p1.x) * raposa.progresso;
+    raposa.y = p1.y + (p2.y - p1.y) * raposa.progresso;
+
+    if (p2.x > p1.x + 0.001) raposa.olhandoParaDireita = true;
+    else if (p2.x < p1.x - 0.001) raposa.olhandoParaDireita = false;
+  }
+}
+
+function desenharRaposaAnimada() {
+  const cfg = configSpriteRaposa;
+
+  const pixelX = raposa.frameAtual * cfg.larguraFrame;
+  const pixelY = cfg.linhaAnimacao * cfg.alturaFrame;
+
+  let u1 = pixelX / cfg.larguraSheet;
+  let u2 = (pixelX + cfg.larguraFrame) / cfg.larguraSheet;
+
+  const v1 = (cfg.alturaSheet - (pixelY + cfg.alturaFrame)) / cfg.alturaSheet;
+  const v2 = (cfg.alturaSheet - pixelY) / cfg.alturaSheet;
+
+  const aspectCanvas = canvas.width / canvas.height;
+  const meiaH = raposa.tamanhoY / 2;
+  const meiaW = meiaH / aspectCanvas;
+
+  desenharRetanguloTexturizado(raposa.x - meiaW, raposa.y - meiaH, raposa.x + meiaW, raposa.y + meiaH, texturaRaposa,
+    u1,
+    v1,
+    u2,
+    v2,
+    false
+  );
+}
+
+
+// --------------------------------------------------------------------------
+// RENDERIZAÇÃO DA CENA
 
 function renderizar() {
   gl.clearColor(0.08, 0.14, 0.08, 1.0);
@@ -550,6 +642,24 @@ function renderizar() {
     48,
     16
   );
+
+  desenharRaposaAnimada();
+
 }
 
-renderizar();
+// ----------------------------------------------------------
+// LOOP DA ANIMAÇÃO
+
+let tempoAnterior = 0;
+
+function loop(tempoAtual) {
+  const deltaTempo = (tempoAtual - tempoAnterior) / 1000 || 0;
+  tempoAnterior = tempoAtual;
+
+  atualizarRaposa(deltaTempo);
+  renderizar();
+
+  requestAnimationFrame(loop);
+}
+
+requestAnimationFrame(loop);
