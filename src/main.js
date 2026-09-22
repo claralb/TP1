@@ -272,7 +272,7 @@ function desenharRetanguloTexturizado(
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
 
-//------------------------------------------------------------------------------
+//--------------------------------------------------------------------------------------------------
 // DESENHAR CAMINHO 
 
 const waypointsEsquerda = [
@@ -505,23 +505,157 @@ function desenharRecorteAtlas(
 const rotaEsquerda = suavizarCaminho(waypointsEsquerda);
 const rotaDireita = suavizarCaminho(waypointsDireita);
 
-const configSpriteRaposa = { larguraSheet: 448,  alturaSheet: 270,  larguraFrame: 32, alturaFrame: 32, linhaAnimacao: 3, totalFrames: 8, fpsAnimacao: 10};
+//configuração do sprite da raposa
 
-const raposa = {indicePonto: 0, progresso: 0, velocidade: 0.10,
+const configSpriteRaposa = {
+  larguraSheet: 448,
+  alturaSheet: 270,
+  larguraFrame: 32,
+  alturaFrame: 32,
+  linhaAnimacao: 3,
+  totalFrames: 8,
+  fpsAnimacao: 10,
+};
+
+
+// configuração das ondas de raposas 
+const configOndas = {intervaloMin: 2.5, intervaloMax: 6.0, quantidadeMin: 1, quantidadeMax: 3, atrasoInicial: 3.2};
+
+const raposa = {
+  indicePonto: 0,
+  progresso: 0,
+  velocidade: 0.10,
   x: waypointsEsquerda[0].x,
   y: waypointsEsquerda[0].y,
   tamanhoY: 0.20,
   tempoAnimacao: 0,
-  frameAtual: 0
+  frameAtual: 0,
+  olhandoParaDireita: true,
 };
 
-const raposaDireita = {indicePonto: 0, progresso: 0, velocidade: 0.10,
+const raposaDireita = {
+  indicePonto: 0,
+  progresso: 0,
+  velocidade: 0.10,
   x: waypointsDireita[0].x,
   y: waypointsDireita[0].y,
-  tamanhoY: 0.20, //define o tamanho da raposa em relação ao canvas
+  tamanhoY: 0.20,
   tempoAnimacao: 0,
   frameAtual: 0,
+  olhandoParaDireita: false,
 };
+
+//vetor que guarda raposas 
+const raposasEmOnda = []; 
+let tempoProximaOnda = configOndas.atrasoInicial;
+//cria as ondas de raposas
+function criarRaposaEmOnda(rota, lado, atrasoAbertura = 0) {
+  return {rota, //rota que a raposa vai seguir
+    indicePonto: 0, //qual ponto da rota a raposa está
+    progresso: 0, //quanto ja foi percorrido
+    velocidade: 0.08 + Math.random() * 0.06, //velocidade da raposa eh um pouco aleatória
+    x: rota[0].x,
+    y: rota[0].y,
+    tamanhoY: 0.20,
+    tempoAnimacao: Math.random() * 2, //evita que elas fiquem sincronizadas
+    frameAtual: 0,
+    ativa: true, //pode criar novas raposas
+    atrasoAbertura,
+  };
+}
+
+//gera ondas de raposas para os dois lados
+function gerarOndaRaposa() {
+  const qtdEsquerda = Math.floor(Math.random() * (configOndas.quantidadeMax - configOndas.quantidadeMin + 1)) + configOndas.quantidadeMin;
+
+  const qtdDireita = Math.floor(Math.random() * (configOndas.quantidadeMax - configOndas.quantidadeMin + 1)) + configOndas.quantidadeMin;
+
+  for (let i = 0; i < qtdEsquerda; i++) {
+    raposasEmOnda.push(criarRaposaEmOnda(rotaEsquerda, "esquerda", i * 0.35));
+  }
+
+  for (let i = 0; i < qtdDireita; i++) {
+    raposasEmOnda.push(criarRaposaEmOnda(rotaDireita, "direita", i * 0.35));
+  }
+}
+
+function atualizarRaposaEmOnda(raposaAtual, deltaTempo) {
+  raposaAtual.tempoAnimacao += deltaTempo; //soma o tempo no cont da animação
+  const frameCalculado = Math.floor(raposaAtual.tempoAnimacao * configSpriteRaposa.fpsAnimacao);
+  raposaAtual.frameAtual = frameCalculado % configSpriteRaposa.totalFrames;
+
+  if (raposaAtual.indicePonto >= raposaAtual.rota.length - 1) {
+    raposaAtual.indicePonto = raposaAtual.rota.length - 1;
+  }
+
+  //garante que segue a rota 
+  const pAtual = raposaAtual.rota[raposaAtual.indicePonto]; 
+  const pProx = raposaAtual.rota[Math.min(raposaAtual.indicePonto + 1, raposaAtual.rota.length - 1)];
+
+  const dx = pProx.x - pAtual.x;
+  const dy = pProx.y - pAtual.y;
+  const dist = Math.hypot(dx, dy);
+
+  if (dist > 0) {
+    raposaAtual.progresso += (raposaAtual.velocidade * deltaTempo) / dist;
+  } else {
+    raposaAtual.progresso = 1.0;
+  }
+
+  while (raposaAtual.progresso >= 1.0 && raposaAtual.indicePonto < raposaAtual.rota.length - 1) {
+    raposaAtual.progresso -= 1.0;
+    raposaAtual.indicePonto++;
+  }
+
+  if (raposaAtual.indicePonto < raposaAtual.rota.length - 1) {
+    const p1 = raposaAtual.rota[raposaAtual.indicePonto];
+    const p2 = raposaAtual.rota[raposaAtual.indicePonto + 1];
+
+    raposaAtual.x = p1.x + (p2.x - p1.x) * raposaAtual.progresso;
+    raposaAtual.y = p1.y + (p2.y - p1.y) * raposaAtual.progresso;
+
+    if (p2.x > p1.x + 0.001) {
+      raposaAtual.olhandoParaDireita = true;
+    } else if (p2.x < p1.x - 0.001) {
+      raposaAtual.olhandoParaDireita = false;
+    }
+  }
+}
+
+//desenha a raposa em onda 
+function desenharRaposaEmOnda(raposaAtual) {
+
+  const cfg = configSpriteRaposa;
+  const pixelX = raposaAtual.frameAtual * cfg.larguraFrame;
+  const pixelY = cfg.linhaAnimacao * cfg.alturaFrame;
+
+  let u1 = pixelX / cfg.larguraSheet;
+  let u2 = (pixelX + cfg.larguraFrame) / cfg.larguraSheet;
+
+  if (!raposaAtual.olhandoParaDireita) {
+    [u1, u2] = [u2, u1];
+  }
+
+  const v1 = (cfg.alturaSheet - (pixelY + cfg.alturaFrame)) / cfg.alturaSheet;
+  const v2 = (cfg.alturaSheet - pixelY) / cfg.alturaSheet;
+
+  const aspectCanvas = canvas.width / canvas.height;
+  const meiaH = raposaAtual.tamanhoY / 2;
+  const meiaW = meiaH / aspectCanvas;
+
+  desenharRetanguloTexturizado(
+    raposaAtual.x - meiaW,
+    raposaAtual.y - meiaH,
+    raposaAtual.x + meiaW,
+    raposaAtual.y + meiaH,
+    texturaRaposa,
+    u1,
+    v1,
+    u2,
+    v2,
+    false
+  );
+}
 
 function atualizarRaposaAnimada(raposaAtual, rota, deltaTempo) {
   if (!raposaAtual || !rota || rota.length < 2) return;
@@ -531,7 +665,8 @@ function atualizarRaposaAnimada(raposaAtual, rota, deltaTempo) {
   raposaAtual.frameAtual = frameCalculado % configSpriteRaposa.totalFrames;
 
   if (raposaAtual.indicePonto >= rota.length - 1) {
-    raposaAtual.indicePonto = 0; raposaAtual.progresso = 0;
+    raposaAtual.indicePonto = 0;
+    raposaAtual.progresso = 0;
   }
 
   const pAtual = rota[raposaAtual.indicePonto];
@@ -608,7 +743,7 @@ function renderizar() {
   gl.clearColor(0.08, 0.14, 0.08, 1.0);
   gl.clear(gl.COLOR_BUFFER_BIT);
 
-    // Fundo de grama
+  // Fundo de grama
   desenharRetanguloTexturizado(
     -1.0,
     -1.0,
@@ -630,7 +765,7 @@ function renderizar() {
     texturaFazenda
   );
 
-    // Pedras no caminho esquerdo
+  // Pedras no caminho esquerdo
   desenharRecorteAtlas(
     -0.90,
     0.36,
@@ -657,6 +792,10 @@ function renderizar() {
   desenharRaposaAnimada(raposa);
   desenharRaposaAnimada(raposaDireita);
 
+  for (const raposaAtual of raposasEmOnda) {
+    desenharRaposaEmOnda(raposaAtual);
+  }
+
   // Galinheiro sobre a área central. As proporções compensam o canvas
   // retangular para que o sprite quadrado não fique achatado.
   desenharRetanguloTexturizado(
@@ -666,8 +805,6 @@ function renderizar() {
     0.42,
     texturaGalinheiro
   );
-
-
 }
 
 // ----------------------------------------------------------
@@ -679,10 +816,23 @@ function loop(tempoAtual) {
   const deltaTempo = (tempoAtual - tempoAnterior) / 1000 || 0;
   tempoAnterior = tempoAtual;
 
+  tempoProximaOnda -= deltaTempo;
+
+  if (tempoProximaOnda <= 0) {
+    gerarOndaRaposa();
+    tempoProximaOnda =
+      Math.random() * (configOndas.intervaloMax - configOndas.intervaloMin) +
+      configOndas.intervaloMin;
+  }
+
   atualizarRaposaAnimada(raposa, rotaEsquerda, deltaTempo);
   atualizarRaposaAnimada(raposaDireita, rotaDireita, deltaTempo);
-  renderizar();
 
+  for (let i = 0; i < raposasEmOnda.length; i++) {
+    atualizarRaposaEmOnda(raposasEmOnda[i], deltaTempo);
+  }
+
+  renderizar();
   requestAnimationFrame(loop);
 }
 
