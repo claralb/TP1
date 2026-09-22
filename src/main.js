@@ -649,7 +649,7 @@ const configSpriteRaposa = {
 
 
 // configuração das ondas de raposas 
-const configOndas = {intervaloMin: 2.5, intervaloMax: 6.0, quantidadeMin: 1, quantidadeMax: 3, atrasoInicial: 3.2};
+const configOndas = {intervaloMin: 2.5, intervaloMax: 6.0, quantidadeMin: 1, quantidadeMax: 3, atrasoInicial: .2};
 
 const raposa = {
   indicePonto: 0,
@@ -699,13 +699,14 @@ function gerarOndaRaposa() {
   const qtdEsquerda = Math.floor(Math.random() * (configOndas.quantidadeMax - configOndas.quantidadeMin + 1)) + configOndas.quantidadeMin;
 
   const qtdDireita = Math.floor(Math.random() * (configOndas.quantidadeMax - configOndas.quantidadeMin + 1)) + configOndas.quantidadeMin;
+  const atrasoEntreRaposas = 0.45;
 
   for (let i = 0; i < qtdEsquerda; i++) {
-    raposasEmOnda.push(criarRaposaEmOnda(rotaEsquerda, "esquerda", i * 0.35));
+    raposasEmOnda.push(criarRaposaEmOnda(rotaEsquerda, "esquerda", i * atrasoEntreRaposas));
   }
 
   for (let i = 0; i < qtdDireita; i++) {
-    raposasEmOnda.push(criarRaposaEmOnda(rotaDireita, "direita", i * 0.35));
+    raposasEmOnda.push(criarRaposaEmOnda(rotaDireita, "direita", i * atrasoEntreRaposas));
   }
 }
 
