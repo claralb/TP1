@@ -125,26 +125,11 @@ function carregarTextura(caminho, repetir = false) {
     gl.bindTexture(gl.TEXTURE_2D, texturaWebGL);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
 
-    gl.texImage2D(
-      gl.TEXTURE_2D,
-      0,
-      gl.RGBA,
-      gl.RGBA,
-      gl.UNSIGNED_BYTE,
-      imagem
-    );
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, imagem);
 
-    gl.texParameteri(
-      gl.TEXTURE_2D,
-      gl.TEXTURE_MIN_FILTER,
-      gl.NEAREST
-    );
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
 
-    gl.texParameteri(
-      gl.TEXTURE_2D,
-      gl.TEXTURE_MAG_FILTER,
-      gl.NEAREST
-    );
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 
     const modo = repetir ? gl.REPEAT : gl.CLAMP_TO_EDGE;
 
@@ -179,7 +164,7 @@ function carregarTextura(caminho, repetir = false) {
 
 
 //adiciona grama
-const texturaGramaClara = carregarTextura("assets/img/grassPix.jpg");
+const texturaGramaClara = carregarTextura("assets/img/grassPixel.jpg");
 
 const texturaFazenda = carregarTextura(
   "assets/img/FarmLand_Tile.png"
