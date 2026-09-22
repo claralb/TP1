@@ -11,23 +11,35 @@ if (!gl) {
 
 gl.viewport(0, 0, canvas.width, canvas.height);
 
+
+// vertex Shader
 const vertexShaderSource = `#version 300 es
-in vec2 aPosition;
-in vec2 aTexCoord; //
+in vec2 a_coord;
+in vec2 a_texCoord;
+out vec2 v_texCoord;
 
 void main() {
-  gl_Position = vec4(aPosition, 0.0, 1.0);
+  gl_Position = vec4(a_coord, 0.0, 1.0);
+  v_texCoord = a_texCoord;
 }
 `;
 
+// Fragment Shader
 const fragmentShaderSource = `#version 300 es
 precision highp float;
 
-uniform vec4 uColor;
-out vec4 outColor;
+uniform sampler2D u_textura;
+uniform vec4 u_cor;
+uniform bool u_usaTextura;
+in vec2 v_texCoord;
+out vec4 o_cor;
 
 void main() {
-  outColor = uColor;
+  if (u_usaTextura) {
+    o_cor = texture(u_textura, v_texCoord);
+  } else {
+    o_cor = u_cor;
+  }
 }
 `;
 
@@ -66,8 +78,11 @@ const vertexShader = criarShader(gl.VERTEX_SHADER, vertexShaderSource);
 const fragmentShader = criarShader(gl.FRAGMENT_SHADER, fragmentShaderSource);
 const programa = criarPrograma(vertexShader, fragmentShader);
 
-const posicao = gl.getAttribLocation(programa, "aPosition");
-const cor = gl.getUniformLocation(programa, "uColor");
+const posicao = gl.getAttribLocation(programa, "a_coord");
+const texCoord = gl.getAttribLocation(programa, "a_texCoord");
+const cor = gl.getUniformLocation(programa, "u_cor");
+const usaTextura = gl.getUniformLocation(programa, "u_usaTextura"); 
+const textura = gl.getUniformLocation(programa, "u_textura");  
 
 const buffer = gl.createBuffer();
 
@@ -102,6 +117,7 @@ function desenharRetangulo(x1, y1, x2, y2, r, g, b, a = 1.0) {
   gl.vertexAttribPointer(posicao, 2, gl.FLOAT, false, 0, 0);
 
   gl.uniform4f(cor, r, g, b, a);
+  gl.uniform1i(usaTextura, 0);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
 
