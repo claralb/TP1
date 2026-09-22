@@ -92,21 +92,33 @@ if (!buffer) {
 
 gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
 
+//CARREGA UMA TEXTURA
+function carregarTextura(caminho) {
+  const texturaWebGL = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, texturaWebGL);
+
+  const imagem = new Image();
+  imagem.onload = function () {
+  gl.bindTexture(gl.TEXTURE_2D, texturaWebGL);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, imagem);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+  gl.generateMipmap(gl.TEXTURE_2D);
+  renderizar();
+};
+  imagem.src = caminho;
+
+  return texturaWebGL;
+}
+
+//adiciona grama
+const texturaGramaClara = carregarTextura("assets/img/grassPix.jpg");
+const texturaGramaEscura = carregarTextura("assets/img/Grass_Middle.png");
+
+
 function desenharRetangulo(x1, y1, x2, y2, r, g, b, a = 1.0) {
   const vertices = new Float32Array([
-    x1,
-    y1,
-    x2,
-    y1,
-    x1,
-    y2,
-
-    x1,
-    y2,
-    x2,
-    y1,
-    x2,
-    y2,
+    x1, y1, x2, y1, x1, y2, x1, y2, x2, y1, x2, y2,
   ]);
 
   gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
@@ -121,41 +133,33 @@ function desenharRetangulo(x1, y1, x2, y2, r, g, b, a = 1.0) {
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
 
-gl.clearColor(0.08, 0.14, 0.08, 1.0); //o 1.0 é opca
-gl.clear(gl.COLOR_BUFFER_BIT);
+function desenharRetanguloTexturizado(x1, y1, x2, y2, texturaWebGL) {
+  const vertices = new Float32Array([
+    x1, y1, 0, 0,
+    x2, y1, 1, 0,
+    x1, y2, 0, 1,
 
-/* Gramado */
-desenharRetangulo(-1.0, -1.0, 1.0, 1.0, 0.25, 0.45, 0.18);
+    x1, y2, 0, 1,
+    x2, y1, 1, 0,
+    x2, y2, 1, 1,
+  ]);
 
-/* Caminho de terra */
-//desenharRetangulo(-0.12, -1.0, 0.12, 1.0, 0.68, 0.48, 0.25);
+  gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+  gl.useProgram(programa);
 
-/* SEGMENTOS AINDA EM ALTERAÇÃO
+  gl.enableVertexAttribArray(posicao);
+  gl.vertexAttribPointer(posicao, 2, gl.FLOAT, false, 16, 0);
 
-function desenharSegmento (x1, y1, x2, y2, espessura, r, g, b){
-  const dx = x2 - x1;
-  const dy = y2 - y1;
+  gl.enableVertexAttribArray(texCoord);
+  gl.vertexAttribPointer(texCoord, 2, gl.FLOAT, false, 16, 8);
 
-  //normaliza
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, texturaWebGL);
+  gl.uniform1i(textura, 0);
+  gl.uniform1i(usaTextura, 1);
 
-  const tamanho = Math.sqrt(dx * dx + dy*dy);
-  const dxNorm = dx / tamanho;
-  const dyNorm = dy / tamanho;
-
-  const perpX = -dyNorm;
-  const perpY = dxNorm;
-
-  const ax1 = x1 + perpX * espessura;
-  const ay1 = y1 + perpY * espessura;
-  const ax2 = x1 - perpX * espessura;
-  const ay2 = y1 - perpY * espessura;
-  const bx1 = x2 + perpX * espessura;
-  const by1 = y2 + perpY * espessura;
-  const bx2 = x2 - perpX * espessura;
-  const by2 = y2 - perpY * espessura;
-
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
- */
 
 /* DESENHAR CAMINHO */
 
@@ -210,8 +214,21 @@ function desenharCaminho(waypoints) {
 //     }
 //   }
 
-desenharCaminho(waypointsEsquerda);
-desenharCaminho(waypointsDireita);
-
 /* Área inicial do galinheiro */
-desenharRetangulo(-0.25, -0.25, 0.25, 0.25, 0.75, 0.22, 0.16);
+//desenharRetangulo(-0.25, -0.25, 0.25, 0.25, 0.75, 0.22, 0.16);
+
+function renderizar() {
+  gl.clearColor(0.08, 0.14, 0.08, 1.0);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+
+  // Preenche a tela inteira com a textura:
+  // x1 = -1.0 (esquerda), y1 = -1.0 (baixo), x2 = 1.0 (direita), y2 = 1.0 (cima)
+  desenharRetanguloTexturizado(-1.0, -1.0, 1.0, 1.0, texturaGramaClara);
+
+  desenharCaminho(waypointsEsquerda);
+  desenharCaminho(waypointsDireita);
+
+  desenharRetangulo(-0.25, -0.25, 0.25, 0.25, 0.75, 0.22, 0.16);
+}
+
+renderizar();
