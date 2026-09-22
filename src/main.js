@@ -922,16 +922,12 @@ function renderizar() {
   desenharRaposaAnimada(raposa);
   desenharRaposaAnimada(raposaDireita);
 
-<<<<<<< HEAD
   for (const raposaAtual of raposasEmOnda) {
     desenharRaposaEmOnda(raposaAtual);
   }
 
   // Galinheiro sobre a área central. As proporções compensam o canvas
   // retangular para que o sprite quadrado não fique achatado.
-=======
-
->>>>>>> 9bd9e2686f863a579647ec895b1aad15af8907c3
   desenharRetanguloTexturizado(
     -0.18,
     -0.22,
@@ -950,7 +946,6 @@ function loop(tempoAtual) {
   const deltaTempo = (tempoAtual - tempoAnterior) / 1000 || 0;
   tempoAnterior = tempoAtual;
 
-<<<<<<< HEAD
   tempoProximaOnda -= deltaTempo;
 
   if (tempoProximaOnda <= 0) {
@@ -962,13 +957,6 @@ function loop(tempoAtual) {
 
   atualizarRaposaAnimada(raposa, rotaEsquerda, deltaTempo);
   atualizarRaposaAnimada(raposaDireita, rotaDireita, deltaTempo);
-=======
-  if (jogoIniciado) {
-    atualizarRaposaAnimada(raposa, rotaEsquerda, deltaTempo);
-    atualizarRaposaAnimada(raposaDireita, rotaDireita, deltaTempo);
-  }
-  renderizar();
->>>>>>> 9bd9e2686f863a579647ec895b1aad15af8907c3
 
   for (let i = 0; i < raposasEmOnda.length; i++) {
     atualizarRaposaEmOnda(raposasEmOnda[i], deltaTempo);
