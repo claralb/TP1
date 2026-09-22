@@ -289,6 +289,7 @@ const waypointsDireita = [
   { x: 0.0, y: 0.0 },
 ];
 
+
 function suavizarCaminho(waypoints, raioPixels = 55, subdivisoes = 10) {
   const paraPixels = (ponto) => ({
     x: ponto.x * canvas.width / 2,
@@ -502,75 +503,96 @@ function desenharRecorteAtlas(
 //   }
 
 const rotaEsquerda = suavizarCaminho(waypointsEsquerda);
+const rotaDireita = suavizarCaminho(waypointsDireita);
 
 const configSpriteRaposa = { larguraSheet: 448,  alturaSheet: 270,  larguraFrame: 32, alturaFrame: 32, linhaAnimacao: 3, totalFrames: 8, fpsAnimacao: 10};
 
 const raposa = {indicePonto: 0, progresso: 0, velocidade: 0.10,
   x: waypointsEsquerda[0].x,
   y: waypointsEsquerda[0].y,
-  tamanhoY: 0.20, //define o tamanho da raposa em relação ao canvas
+  tamanhoY: 0.20,
   tempoAnimacao: 0,
   frameAtual: 0
 };
 
-//move para cada frame
-function atualizarRaposa(deltaTempo) {
-  raposa.tempoAnimacao += deltaTempo;
-  const frameCalculado = Math.floor(raposa.tempoAnimacao * configSpriteRaposa.fpsAnimacao);
-  raposa.frameAtual = frameCalculado % configSpriteRaposa.totalFrames;
+const raposaDireita = {indicePonto: 0, progresso: 0, velocidade: 0.10,
+  x: waypointsDireita[0].x,
+  y: waypointsDireita[0].y,
+  tamanhoY: 0.20, //define o tamanho da raposa em relação ao canvas
+  tempoAnimacao: 0,
+  frameAtual: 0,
+};
 
-  if (raposa.indicePonto >= rotaEsquerda.length - 1) {
-    raposa.indicePonto = 0;
-    raposa.progresso = 0;
+function atualizarRaposaAnimada(raposaAtual, rota, deltaTempo) {
+  if (!raposaAtual || !rota || rota.length < 2) return;
+
+  raposaAtual.tempoAnimacao += deltaTempo;
+  const frameCalculado = Math.floor(raposaAtual.tempoAnimacao * configSpriteRaposa.fpsAnimacao);
+  raposaAtual.frameAtual = frameCalculado % configSpriteRaposa.totalFrames;
+
+  if (raposaAtual.indicePonto >= rota.length - 1) {
+    raposaAtual.indicePonto = 0; raposaAtual.progresso = 0;
   }
 
-  const pAtual = rotaEsquerda[raposa.indicePonto];
-  const pProx = rotaEsquerda[raposa.indicePonto + 1];
+  const pAtual = rota[raposaAtual.indicePonto];
+  const pProx = rota[Math.min(raposaAtual.indicePonto + 1, rota.length - 1)];
 
   const dx = pProx.x - pAtual.x;
   const dy = pProx.y - pAtual.y;
   const dist = Math.hypot(dx, dy);
 
   if (dist > 0) {
-    raposa.progresso += (raposa.velocidade * deltaTempo) / dist;
+    raposaAtual.progresso += (raposaAtual.velocidade * deltaTempo) / dist;
   } else {
-    raposa.progresso = 1.0;
+    raposaAtual.progresso = 1.0;
   }
 
-  while (raposa.progresso >= 1.0 && raposa.indicePonto < rotaEsquerda.length - 1) {
-    raposa.progresso -= 1.0;
-    raposa.indicePonto++;
+  while (raposaAtual.progresso >= 1.0 && raposaAtual.indicePonto < rota.length - 1) {
+    raposaAtual.progresso -= 1.0;
+    raposaAtual.indicePonto++;
   }
 
-  if (raposa.indicePonto < rotaEsquerda.length - 1) {
-    const p1 = rotaEsquerda[raposa.indicePonto];
-    const p2 = rotaEsquerda[raposa.indicePonto + 1];
+  if (raposaAtual.indicePonto < rota.length - 1) {
+    const p1 = rota[raposaAtual.indicePonto];
+    const p2 = rota[raposaAtual.indicePonto + 1];
 
-    raposa.x = p1.x + (p2.x - p1.x) * raposa.progresso;
-    raposa.y = p1.y + (p2.y - p1.y) * raposa.progresso;
+    raposaAtual.x = p1.x + (p2.x - p1.x) * raposaAtual.progresso;
+    raposaAtual.y = p1.y + (p2.y - p1.y) * raposaAtual.progresso;
 
-    if (p2.x > p1.x + 0.001) raposa.olhandoParaDireita = true;
-    else if (p2.x < p1.x - 0.001) raposa.olhandoParaDireita = false;
+    if (p2.x > p1.x + 0.001) {
+      raposaAtual.olhandoParaDireita = true;
+    } else if (p2.x < p1.x - 0.001) {
+      raposaAtual.olhandoParaDireita = false;
+    }
   }
 }
 
-function desenharRaposaAnimada() {
+function desenharRaposaAnimada(raposaAtual) {
   const cfg = configSpriteRaposa;
 
-  const pixelX = raposa.frameAtual * cfg.larguraFrame;
+  const pixelX = raposaAtual.frameAtual * cfg.larguraFrame;
   const pixelY = cfg.linhaAnimacao * cfg.alturaFrame;
 
   let u1 = pixelX / cfg.larguraSheet;
   let u2 = (pixelX + cfg.larguraFrame) / cfg.larguraSheet;
 
+  if (!raposaAtual.olhandoParaDireita) {
+    [u1, u2] = [u2, u1];
+  }
+
   const v1 = (cfg.alturaSheet - (pixelY + cfg.alturaFrame)) / cfg.alturaSheet;
   const v2 = (cfg.alturaSheet - pixelY) / cfg.alturaSheet;
 
   const aspectCanvas = canvas.width / canvas.height;
-  const meiaH = raposa.tamanhoY / 2;
+  const meiaH = raposaAtual.tamanhoY / 2;
   const meiaW = meiaH / aspectCanvas;
 
-  desenharRetanguloTexturizado(raposa.x - meiaW, raposa.y - meiaH, raposa.x + meiaW, raposa.y + meiaH, texturaRaposa,
+  desenharRetanguloTexturizado(
+    raposaAtual.x - meiaW,
+    raposaAtual.y - meiaH,
+    raposaAtual.x + meiaW,
+    raposaAtual.y + meiaH,
+    texturaRaposa,
     u1,
     v1,
     u2,
@@ -578,7 +600,6 @@ function desenharRaposaAnimada() {
     false
   );
 }
-
 
 // --------------------------------------------------------------------------
 // RENDERIZAÇÃO DA CENA
@@ -609,17 +630,7 @@ function renderizar() {
     texturaFazenda
   );
 
-  // Galinheiro sobre a área central. As proporções compensam o canvas
-  // retangular para que o sprite quadrado não fique achatado.
-  desenharRetanguloTexturizado(
-    -0.18,
-    -0.22,
-    0.18,
-    0.42,
-    texturaGalinheiro
-  );
-
-  // Pedras no caminho esquerdo
+    // Pedras no caminho esquerdo
   desenharRecorteAtlas(
     -0.90,
     0.36,
@@ -643,7 +654,19 @@ function renderizar() {
     16
   );
 
-  desenharRaposaAnimada();
+  desenharRaposaAnimada(raposa);
+  desenharRaposaAnimada(raposaDireita);
+
+  // Galinheiro sobre a área central. As proporções compensam o canvas
+  // retangular para que o sprite quadrado não fique achatado.
+  desenharRetanguloTexturizado(
+    -0.18,
+    -0.22,
+    0.18,
+    0.42,
+    texturaGalinheiro
+  );
+
 
 }
 
@@ -656,7 +679,8 @@ function loop(tempoAtual) {
   const deltaTempo = (tempoAtual - tempoAnterior) / 1000 || 0;
   tempoAnterior = tempoAtual;
 
-  atualizarRaposa(deltaTempo);
+  atualizarRaposaAnimada(raposa, rotaEsquerda, deltaTempo);
+  atualizarRaposaAnimada(raposaDireita, rotaDireita, deltaTempo);
   renderizar();
 
   requestAnimationFrame(loop);
