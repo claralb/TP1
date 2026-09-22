@@ -61,9 +61,15 @@
             </div>
         </section>
 
-        <button id="exit-game" type="button" aria-label="Sair para o menu principal" title="Sair para o menu" hidden>
+        <!-- CONTROLES DO JOGO: grupo que contém o botão da galinha e o botão X -->
+        <div class="controles">
+            <!-- BOTÃO DA GALINHA: a imagem e o posicionamento são definidos no style.css -->
+            <button id="chicken-button" class="controles_button" type="button" aria-label="Botão da galinha">
+            </button>
+            <button id="exit-game" type="button" aria-label="Sair para o menu principal" title="Sair para o menu" hidden>
             <span class="sr-only">Sair</span>
-        </button>
+            </button>
+        </div>
     </main>
     <script src="./src/main.js"></script>
 </body>

@@ -354,19 +354,42 @@ button:focus-visible {
   }
 }
 
-#exit-game {
+.controles {
   position: absolute;
-  z-index: 1;
+  z-index: 3;
   top: clamp(14px, 2vw, 28px);
   right: clamp(14px, 2vw, 28px);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.controles_button,
+#exit-game {
   width: clamp(42px, 4.2vw, 58px);
   height: clamp(42px, 4.2vw, 58px);
   padding: 0;
   border: 0;
-  background: url("assets/img/close-button.png") center / 100% 100% no-repeat;
   box-shadow: none;
   image-rendering: pixelated;
   clip-path: none;
+}
+
+/* BOTÃO DA GALINHA*/
+.controles_button {
+  background: url("assets/img/chickenbutton.jpg") center / 100% 100% no-repeat;
+}
+
+.controles_button:hover,
+.controles_button:active {
+  filter: none;
+  transform: none;
+  box-shadow: none;
+}
+
+#exit-game {
+  position: static;
+  background: url("assets/img/close-button.png") center / 100% 100% no-repeat;
 }
 
 #exit-game:hover {
@@ -378,6 +401,7 @@ button:focus-visible {
   transform: translateY(4px);
   box-shadow: none;
 }
+
 
 .sr-only {
   position: absolute;
@@ -394,3 +418,4 @@ button:focus-visible {
 [hidden] {
   display: none !important;
 }
+
