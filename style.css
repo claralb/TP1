@@ -150,6 +150,16 @@ canvas.is-blurred {
   grid-column: 1 / -1;
 }
 
+.pause-actions {
+  display: grid;
+  gap: 14px;
+}
+
+.pause-actions button {
+  width: 100%;
+  padding: 17px 24px;
+}
+
 button {
   border: 0;
   border-radius: 0;
@@ -362,6 +372,32 @@ button:focus-visible {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+#game-timer {
+  position: absolute;
+  z-index: 3;
+  top: clamp(14px, 2vw, 28px);
+  left: 50%;
+  min-width: clamp(110px, 10vw, 148px);
+  padding: clamp(9px, 0.9vw, 13px) clamp(16px, 1.6vw, 24px);
+  transform: translateX(-50%);
+  color: #fff1c9;
+  border: clamp(3px, 0.3vw, 5px) solid #3a2118;
+  background: #874725;
+  box-shadow:
+    inset 0 clamp(3px, 0.3vw, 5px) #c9793c,
+    inset 0 clamp(-5px, -0.4vw, -3px) #542a1d;
+  font: 900 clamp(18px, 2vw, 28px)/1 "Courier New", monospace;
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-shadow: 3px 3px 0 #3a2118;
+  image-rendering: pixelated;
+}
+
+#game-time {
+  font: inherit;
+  font-variant-numeric: tabular-nums;
 }
 
 .controles_button,

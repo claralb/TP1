@@ -61,8 +61,22 @@
             </div>
         </section>
 
+        <section id="pause-menu" class="secondary-menu is-hidden" aria-labelledby="pause-title">
+            <div class="menu-card compact-card">
+                <h2 id="pause-title">Jogo pausado</h2>
+                <div class="pause-actions">
+                    <button id="continue-game" class="primary-action" type="button">Continuar</button>
+                    <button id="restart-game" type="button">Reiniciar</button>
+                </div>
+            </div>
+        </section>
+
+        <div id="game-timer" aria-label="Tempo de jogo" hidden>
+            <output id="game-time">00:00</output>
+        </div>
+
         <div class="controles">
-            <button id="chicken-button" class="controles_button" type="button" aria-label="Botão da galinha">
+            <button id="chicken-button" class="controles_button" type="button" aria-label="Arraste para posicionar uma torre de galinha" hidden>
             </button>
             <button id="exit-game" type="button" aria-label="Sair para o menu principal" title="Sair para o menu" hidden>
             <span class="sr-only">Sair</span>

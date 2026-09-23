@@ -7,16 +7,35 @@ if (!canvas) {
 const menuPrincipal = document.getElementById("main-menu");
 const menuCreditos = document.getElementById("credits-menu");
 const menuConfiguracoes = document.getElementById("settings-menu");
+const menuPausa = document.getElementById("pause-menu");
 const botaoIniciar = document.getElementById("start-game");
+const botaoContinuar = document.getElementById("continue-game");
+const botaoReiniciar = document.getElementById("restart-game");
 const botaoSair = document.getElementById("exit-game");
 const botaoGalinha = document.getElementById("chicken-button");
+const cronometro = document.getElementById("game-timer");
+const textoCronometro = document.getElementById("game-time");
 const controleMusica = document.getElementById("music-enabled");
 const controleVolume = document.getElementById("music-volume");
 const statusMusica = document.getElementById("music-status");
 const valorVolume = document.getElementById("volume-value");
 let jogoIniciado = false;
+let tempoDeJogo = 0;
 let colocandoTorre = false;
 const torresGalinha = [];
+const ovosDisparados = [];
+let previewTorre = null;
+let ponteiroTorre = null;
+let inicioArrasteTorre = null;
+
+const TORRE_MEIA_ALTURA = 0.25;
+const TORRE_MEIA_LARGURA = TORRE_MEIA_ALTURA / (canvas.width / canvas.height);
+const CAMINHO_ESPESSURA = 0.06;
+const FATOR_ESPACAMENTO_TORRES = 0.5;
+const INTERVALO_TIRO_TORRE = 1.15;
+const VELOCIDADE_OVO_PIXELS = 390;
+const RAIO_IMPACTO_OVO_PIXELS = 25;
+const DURACAO_ANIMACAO_TIRO = 0.48;
 
 let audioContexto = null;
 let ganhoMusica = null;
@@ -80,14 +99,20 @@ function iniciarMusica() {
 }
 
 function abrirMenu(menu) {
+  jogoIniciado = false;
+  cancelarPosicionamentoTorre();
   menuPrincipal.classList.add("is-hidden");
+  menuPausa.classList.add("is-hidden");
   menuCreditos.classList.toggle("is-hidden", menu !== "credits");
   menuConfiguracoes.classList.toggle("is-hidden", menu !== "settings");
 }
 
 function voltarAoMenuPrincipal() {
+  jogoIniciado = false;
+  cancelarPosicionamentoTorre();
   menuCreditos.classList.add("is-hidden");
   menuConfiguracoes.classList.add("is-hidden");
+  menuPausa.classList.add("is-hidden");
   menuPrincipal.classList.remove("is-hidden");
   botaoIniciar.focus();
 }
@@ -99,45 +124,230 @@ function mostrarJogo() {
   menuPrincipal.classList.add("is-hidden");
   menuCreditos.classList.add("is-hidden");
   menuConfiguracoes.classList.add("is-hidden");
+  menuPausa.classList.add("is-hidden");
+  cronometro.hidden = false;
+  botaoGalinha.hidden = false;
   botaoSair.hidden = false;
 }
 
-function mostrarMenu() {
+function pausarJogo() {
+  jogoIniciado = false;
+  canvas.classList.add("is-blurred");
+  cancelarPosicionamentoTorre();
+  menuPrincipal.classList.add("is-hidden");
+  menuCreditos.classList.add("is-hidden");
+  menuConfiguracoes.classList.add("is-hidden");
+  menuPausa.classList.remove("is-hidden");
+  cronometro.hidden = true;
+  botaoGalinha.hidden = true;
+  botaoSair.hidden = true;
+}
+
+function reiniciarParaMenuPrincipal() {
+  tempoDeJogo = 0;
+  textoCronometro.textContent = "00:00";
+  torresGalinha.length = 0;
+  ovosDisparados.length = 0;
+  raposasEmOnda.length = 0;
+  tempoProximaOnda = configOndas.atrasoInicial;
+
+  Object.assign(raposa, {
+    indicePonto: 0,
+    progresso: 0,
+    x: rotaEsquerda[0].x,
+    y: rotaEsquerda[0].y,
+    tempoAnimacao: 0,
+    frameAtual: 0,
+    olhandoParaDireita: true,
+  });
+  Object.assign(raposaDireita, {
+    indicePonto: 0,
+    progresso: 0,
+    x: rotaDireita[0].x,
+    y: rotaDireita[0].y,
+    tempoAnimacao: 0,
+    frameAtual: 0,
+    olhandoParaDireita: false,
+  });
+
   jogoIniciado = false;
   canvas.classList.add("is-blurred");
   voltarAoMenuPrincipal();
+  cronometro.hidden = true;
+  botaoGalinha.hidden = true;
   botaoSair.hidden = true;
 }
 
 botaoIniciar.addEventListener("click", mostrarJogo);
-botaoSair.addEventListener("click", mostrarMenu);
+botaoSair.addEventListener("click", pausarJogo);
+botaoContinuar.addEventListener("click", mostrarJogo);
+botaoReiniciar.addEventListener("click", reiniciarParaMenuPrincipal);
 
 // FUNCIONALIDADES PARA BOTÃO GALINHA -----------------------------------------------
-botaoGalinha.addEventListener("click", () => {
+function posicaoCanvasDoPonteiro(evento) {
+  const area = canvas.getBoundingClientRect();
+  const dentro = evento.clientX >= area.left && evento.clientX <= area.right &&
+    evento.clientY >= area.top && evento.clientY <= area.bottom;
+  const x = ((evento.clientX - area.left) / area.width) * 2 - 1;
+  const y = 1 - ((evento.clientY - area.top) / area.height) * 2;
+  return {
+    x: Math.max(-1 + TORRE_MEIA_LARGURA, Math.min(1 - TORRE_MEIA_LARGURA, x)),
+    y: Math.max(-1 + TORRE_MEIA_ALTURA, Math.min(1 - TORRE_MEIA_ALTURA, y)),
+    dentro,
+  };
+}
+
+function segmentoInterceptaRetangulo(a, b, esquerda, direita, topo, baixo) {
+  let tMin = 0;
+  let tMax = 1;
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const limites = [
+    [-dx, a.x - esquerda],
+    [dx, direita - a.x],
+    [-dy, a.y - topo],
+    [dy, baixo - a.y],
+  ];
+
+  for (const [p, q] of limites) {
+    if (Math.abs(p) < 1e-9) {
+      if (q < 0) return false;
+      continue;
+    }
+    const t = q / p;
+    if (p < 0) tMin = Math.max(tMin, t);
+    else tMax = Math.min(tMax, t);
+    if (tMin > tMax) return false;
+  }
+  return true;
+}
+
+function distanciaQuadradaPontoSegmento(ponto, a, b) {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const comprimentoQuadrado = dx * dx + dy * dy;
+  if (comprimentoQuadrado === 0) {
+    return (ponto.x - a.x) ** 2 + (ponto.y - a.y) ** 2;
+  }
+  const t = Math.max(0, Math.min(1,
+    ((ponto.x - a.x) * dx + (ponto.y - a.y) * dy) / comprimentoQuadrado
+  ));
+  const xMaisProximo = a.x + t * dx;
+  const yMaisProximo = a.y + t * dy;
+  return (ponto.x - xMaisProximo) ** 2 + (ponto.y - yMaisProximo) ** 2;
+}
+
+function distanciaQuadradaPontoRetangulo(ponto, esquerda, direita, topo, baixo) {
+  const dx = Math.max(esquerda - ponto.x, 0, ponto.x - direita);
+  const dy = Math.max(topo - ponto.y, 0, ponto.y - baixo);
+  return dx * dx + dy * dy;
+}
+
+function distanciaQuadradaSegmentoRetangulo(a, b, esquerda, direita, topo, baixo) {
+  if (segmentoInterceptaRetangulo(a, b, esquerda, direita, topo, baixo)) return 0;
+  const cantos = [
+    { x: esquerda, y: topo },
+    { x: direita, y: topo },
+    { x: esquerda, y: baixo },
+    { x: direita, y: baixo },
+  ];
+  return Math.min(
+    distanciaQuadradaPontoRetangulo(a, esquerda, direita, topo, baixo),
+    distanciaQuadradaPontoRetangulo(b, esquerda, direita, topo, baixo),
+    ...cantos.map((canto) => distanciaQuadradaPontoSegmento(canto, a, b)),
+  );
+}
+
+function torreSobrepoeCaminho(torre) {
+  const centroX = (torre.x + 1) * canvas.width / 2;
+  const centroY = (1 - torre.y) * canvas.height / 2;
+  const meiaLarguraPixels = TORRE_MEIA_LARGURA * canvas.width / 2;
+  const meiaAlturaPixels = TORRE_MEIA_ALTURA * canvas.height / 2;
+  const esquerda = centroX - meiaLarguraPixels;
+  const direita = centroX + meiaLarguraPixels;
+  const topo = centroY - meiaAlturaPixels;
+  const baixo = centroY + meiaAlturaPixels;
+
+  const distanciaMinima = CAMINHO_ESPESSURA * canvas.height / 2 + 0.5;
+  const distanciaMinimaQuadrada = distanciaMinima * distanciaMinima;
+
+  for (const rota of [rotaEsquerda, rotaDireita]) {
+    for (let i = 0; i < rota.length - 1; i++) {
+      const a = {
+        x: (rota[i].x + 1) * canvas.width / 2,
+        y: (1 - rota[i].y) * canvas.height / 2,
+      };
+      const b = {
+        x: (rota[i + 1].x + 1) * canvas.width / 2,
+        y: (1 - rota[i + 1].y) * canvas.height / 2,
+      };
+      if (distanciaQuadradaSegmentoRetangulo(
+        a,
+        b,
+        esquerda,
+        direita,
+        topo,
+        baixo,
+      ) <= distanciaMinimaQuadrada) return true;
+    }
+  }
+  return false;
+}
+
+function posicaoTorreValida(torre) {
+  const sobrepoeOutraTorre = torresGalinha.some((existente) =>
+    Math.abs(existente.x - torre.x) < TORRE_MEIA_LARGURA * 2 * FATOR_ESPACAMENTO_TORRES &&
+    Math.abs(existente.y - torre.y) < TORRE_MEIA_ALTURA * 2 * FATOR_ESPACAMENTO_TORRES
+  );
+  return !sobrepoeOutraTorre && !torreSobrepoeCaminho(torre);
+}
+
+function atualizarPreviewTorre(evento) {
+  if (!colocandoTorre || evento.pointerId !== ponteiroTorre) return;
+  const posicao = posicaoCanvasDoPonteiro(evento);
+  previewTorre = { x: posicao.x, y: posicao.y, dentro: posicao.dentro };
+}
+
+function cancelarPosicionamentoTorre() {
+  colocandoTorre = false;
+  previewTorre = null;
+  ponteiroTorre = null;
+  inicioArrasteTorre = null;
+  botaoGalinha.removeAttribute("aria-pressed");
+}
+
+botaoGalinha.addEventListener("pointerdown", (evento) => {
+  if (!jogoIniciado || evento.button !== 0) return;
+  evento.preventDefault();
   colocandoTorre = true;
+  ponteiroTorre = evento.pointerId;
+  inicioArrasteTorre = { x: evento.clientX, y: evento.clientY };
+  botaoGalinha.setPointerCapture(evento.pointerId);
   botaoGalinha.setAttribute("aria-pressed", "true");
+  atualizarPreviewTorre(evento);
 });
 
-canvas.addEventListener("click", (evento) => {
-  
-  const areaCanvas = canvas.getBoundingClientRect(); //função pronta que retorna as dimensões do canvas na tela
-  const x = ((evento.clientX - areaCanvas.left) / areaCanvas.width) * 2 - 1;
-  const y = 1 - ((evento.clientY - areaCanvas.top) / areaCanvas.height) * 2;
+botaoGalinha.addEventListener("pointermove", atualizarPreviewTorre);
 
-  const meiaAltura = 0.12;
-  const meiaLargura = meiaAltura / (canvas.width / canvas.height);
-
-  // Controla a posição para a torre não sair da tela.
-  const novaTorre = {x: Math.max(-1 + meiaLargura, Math.min(1 - meiaLargura, x)),y: Math.max(-1 + meiaAltura, Math.min(1 - meiaAltura, y)),};
-
-  // impede que o espaço ocupado por uma torre se sobreponha a outra
-  const torreSobreposta = torresGalinha.some((torre) => Math.abs(torre.x - novaTorre.x) < meiaLargura * 2.5 && Math.abs(torre.y - novaTorre.y) < meiaAltura * 2.5);
-
-  //se a conficao de torresobreposta for falsa, adiciona nova torre
-  if (!torreSobreposta) {
-    torresGalinha.push(novaTorre);
+botaoGalinha.addEventListener("pointerup", (evento) => {
+  if (!colocandoTorre || evento.pointerId !== ponteiroTorre) return;
+  atualizarPreviewTorre(evento);
+  const distancia = Math.hypot(
+    evento.clientX - inicioArrasteTorre.x,
+    evento.clientY - inicioArrasteTorre.y,
+  );
+  if (distancia > 8 && previewTorre?.dentro && posicaoTorreValida(previewTorre)) {
+    torresGalinha.push({
+      x: previewTorre.x,
+      y: previewTorre.y,
+      tempoAteTiro: 0.15,
+      animacaoTiro: 0,
+    });
   }
-})
+  cancelarPosicionamentoTorre();
+});
+
+botaoGalinha.addEventListener("pointercancel", cancelarPosicionamentoTorre);
 
 document.querySelectorAll("[data-open-menu]").forEach((botao) => {
   botao.addEventListener("click", () => {
@@ -208,7 +418,7 @@ void main() {
       discard;
     }
 
-    o_cor = corTextura;
+    o_cor = vec4(corTextura.rgb * u_cor.rgb, corTextura.a * u_cor.a);
   } else {
     o_cor = u_cor;
   }
@@ -346,6 +556,14 @@ const texturaTorreGalinha = carregarTextura(
   "assets/img/torreGalinha.png"
 );
 
+const texturaGalinhaAtiradora = carregarTextura(
+  "assets/img/galinha-atiradora.png"
+);
+
+const texturaOvos = carregarTextura(
+  "assets/img/ovos.png"
+);
+
 const texturaCaminho = carregarTextura(
   "assets/img/Path_Middle.png",
   true
@@ -390,7 +608,9 @@ function desenharRetanguloTexturizado(
   v1 = 0,
   u2 = 1,
   v2 = 1,
-  removerFundo = false
+  removerFundo = false,
+  opacidade = 1,
+  multiplicadorCor = [1, 1, 1]
 ) {
   const vertices = new Float32Array([
     x1, y1, u1, v1,
@@ -433,21 +653,73 @@ function desenharRetanguloTexturizado(
   gl.uniform1i(textura, 0);
   gl.uniform1i(usaTextura, 1);
   gl.uniform1i(removeFundo, removerFundo ? 1 : 0);
+  gl.uniform4f(
+    cor,
+    multiplicadorCor[0],
+    multiplicadorCor[1],
+    multiplicadorCor[2],
+    opacidade,
+  );
 
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 }
 
 function desenharTorresGalinha() {
-  const meiaAltura = 0.25;
-  const meiaLargura = meiaAltura / (canvas.width / canvas.height);
-
   for (const torre of torresGalinha) {
     desenharRetanguloTexturizado(
-      torre.x - meiaLargura,
-      torre.y - meiaAltura,
-      torre.x + meiaLargura,
-      torre.y + meiaAltura,
+      torre.x - TORRE_MEIA_LARGURA,
+      torre.y - TORRE_MEIA_ALTURA,
+      torre.x + TORRE_MEIA_LARGURA,
+      torre.y + TORRE_MEIA_ALTURA,
       texturaTorreGalinha
+    );
+
+    const totalFrames = 4;
+    const progressoAnimacao = torre.animacaoTiro > 0
+      ? 1 - torre.animacaoTiro / DURACAO_ANIMACAO_TIRO
+      : 0;
+    const frame = torre.animacaoTiro > 0
+      ? Math.min(totalFrames - 1, Math.floor(progressoAnimacao * totalFrames))
+      : 0;
+    const u1 = frame / totalFrames;
+    const u2 = (frame + 1) / totalFrames;
+    const mostrandoCostas = torre.animacaoTiro > 0 &&
+      torre.animacaoTiro <= DURACAO_ANIMACAO_TIRO / 2;
+    const pixelY = mostrandoCostas ? 16 : 0;
+    const v1 = (32 - (pixelY + 16)) / 32;
+    const v2 = (32 - pixelY) / 32;
+    const meiaAlturaGalinha = 0.056;
+    const meiaLarguraGalinha = meiaAlturaGalinha / (canvas.width / canvas.height);
+    const centroYGalinha = torre.y + 0.181;
+    desenharRetanguloTexturizado(
+      torre.x - meiaLarguraGalinha,
+      centroYGalinha - meiaAlturaGalinha,
+      torre.x + meiaLarguraGalinha,
+      centroYGalinha + meiaAlturaGalinha,
+      texturaGalinhaAtiradora,
+      u1,
+      v1,
+      u2,
+      v2,
+      false,
+    );
+  }
+
+  if (previewTorre && jogoIniciado) {
+    const previewValida = previewTorre.dentro && posicaoTorreValida(previewTorre);
+    desenharRetanguloTexturizado(
+      previewTorre.x - TORRE_MEIA_LARGURA,
+      previewTorre.y - TORRE_MEIA_ALTURA,
+      previewTorre.x + TORRE_MEIA_LARGURA,
+      previewTorre.y + TORRE_MEIA_ALTURA,
+      texturaTorreGalinha,
+      0,
+      0,
+      1,
+      1,
+      false,
+      0.48,
+      previewValida ? [1, 1, 1] : [1, 0.22, 0.18],
     );
   }
 }
@@ -536,7 +808,7 @@ function suavizarCaminho(waypoints, raioPixels = 55, subdivisoes = 10) {
 
 function desenharCaminho(waypoints) {
   const pontos = suavizarCaminho(waypoints);
-  const espessura = 0.06;
+  const espessura = CAMINHO_ESPESSURA;
   const meiaLarguraPixels = espessura * canvas.height / 2;
   const tamanhoTilePixels = espessura * canvas.height;
   const normais = [];
@@ -760,6 +1032,91 @@ function gerarOndaRaposa() {
   }
 }
 
+function raposasDisponiveisComoAlvo() {
+  return [
+    raposa,
+    raposaDireita,
+    ...raposasEmOnda.filter((raposaAtual) => raposaAtual.ativa !== false),
+  ];
+}
+
+function raposaMaisProxima(torre) {
+  const origemY = torre.y + 0.19;
+  let alvoMaisProximo = null;
+  let menorDistanciaQuadrada = Infinity;
+
+  for (const raposaAtual of raposasDisponiveisComoAlvo()) {
+    const dxPixels = (raposaAtual.x - torre.x) * canvas.width / 2;
+    const dyPixels = (raposaAtual.y - origemY) * canvas.height / 2;
+    const distanciaQuadrada = dxPixels * dxPixels + dyPixels * dyPixels;
+    if (distanciaQuadrada < menorDistanciaQuadrada) {
+      menorDistanciaQuadrada = distanciaQuadrada;
+      alvoMaisProximo = raposaAtual;
+    }
+  }
+  return alvoMaisProximo;
+}
+
+function atualizarAtaquesDasTorres(deltaTempo) {
+  for (const torre of torresGalinha) {
+    torre.tempoAteTiro = (torre.tempoAteTiro ?? 0) - deltaTempo;
+    torre.animacaoTiro = Math.max(0, (torre.animacaoTiro ?? 0) - deltaTempo);
+
+    if (torre.tempoAteTiro <= 0) {
+      const alvo = raposaMaisProxima(torre);
+      if (alvo) {
+        torre.alvoDoTiro = alvo;
+        torre.ovoDisparadoNesteCiclo = false;
+        torre.animacaoTiro = DURACAO_ANIMACAO_TIRO;
+        torre.tempoAteTiro = INTERVALO_TIRO_TORRE;
+      }
+    }
+
+    // O ovo nasce somente quando a galinha já virou de costas.
+    if (
+      torre.animacaoTiro > 0 &&
+      torre.animacaoTiro <= DURACAO_ANIMACAO_TIRO / 2 &&
+      !torre.ovoDisparadoNesteCiclo &&
+      torre.alvoDoTiro
+    ) {
+      ovosDisparados.push({
+        x: torre.x - 0.025,
+        y: torre.y + 0.185,
+        alvo: torre.alvoDoTiro,
+        frame: 0,
+        tempoAnimacao: 0,
+      });
+      torre.ovoDisparadoNesteCiclo = true;
+    }
+  }
+
+  for (let i = ovosDisparados.length - 1; i >= 0; i--) {
+    const ovo = ovosDisparados[i];
+    if (!ovo.alvo || ovo.alvo.ativa === false) {
+      ovosDisparados.splice(i, 1);
+      continue;
+    }
+
+    const dx = ovo.alvo.x - ovo.x;
+    const dy = ovo.alvo.y - ovo.y;
+    const dxPixels = dx * canvas.width / 2;
+    const dyPixels = dy * canvas.height / 2;
+    const distanciaPixels = Math.hypot(dxPixels, dyPixels);
+    const deslocamentoPixels = VELOCIDADE_OVO_PIXELS * deltaTempo;
+
+    if (distanciaPixels <= RAIO_IMPACTO_OVO_PIXELS + deslocamentoPixels) {
+      ovosDisparados.splice(i, 1);
+      continue;
+    }
+
+    const fracaoMovimento = deslocamentoPixels / distanciaPixels;
+    ovo.x += dx * fracaoMovimento;
+    ovo.y += dy * fracaoMovimento;
+    ovo.tempoAnimacao += deltaTempo;
+    ovo.frame = Math.floor(ovo.tempoAnimacao * 12) % 4;
+  }
+}
+
 function atualizarRaposaEmOnda(raposaAtual, deltaTempo) {
   raposaAtual.tempoAnimacao += deltaTempo; //soma o tempo no cont da animação
   const frameCalculado = Math.floor(raposaAtual.tempoAnimacao * configSpriteRaposa.fpsAnimacao);
@@ -917,6 +1274,33 @@ function desenharRaposaAnimada(raposaAtual) {
   );
 }
 
+function desenharOvosDisparados() {
+  const alturaSheet = 48;
+  const tamanhoFrame = 16;
+  const linhaOvoBranco = 32;
+  const v1 = (alturaSheet - (linhaOvoBranco + tamanhoFrame)) / alturaSheet;
+  const v2 = (alturaSheet - linhaOvoBranco) / alturaSheet;
+  const meiaAltura = 0.025;
+  const meiaLargura = meiaAltura / (canvas.width / canvas.height);
+
+  for (const ovo of ovosDisparados) {
+    const u1 = ovo.frame / 4;
+    const u2 = (ovo.frame + 1) / 4;
+    desenharRetanguloTexturizado(
+      ovo.x - meiaLargura,
+      ovo.y - meiaAltura,
+      ovo.x + meiaLargura,
+      ovo.y + meiaAltura,
+      texturaOvos,
+      u1,
+      v1,
+      u2,
+      v2,
+      false,
+    );
+  }
+}
+
 // --------------------------------------------------------------------------
 // RENDERIZAÇÃO DA CENA
 
@@ -979,6 +1363,8 @@ function renderizar() {
     desenharRaposaEmOnda(raposaAtual);
   }
 
+  desenharOvosDisparados();
+
   // Galinheiro sobre a área central. As proporções compensam o canvas
   // retangular para que o sprite quadrado não fique achatado.
   desenharRetanguloTexturizado(
@@ -999,20 +1385,29 @@ function loop(tempoAtual) {
   const deltaTempo = (tempoAtual - tempoAnterior) / 1000 || 0;
   tempoAnterior = tempoAtual;
 
-  tempoProximaOnda -= deltaTempo;
+  if (jogoIniciado) {
+    tempoDeJogo += deltaTempo;
+    const minutos = Math.floor(tempoDeJogo / 60).toString().padStart(2, "0");
+    const segundos = Math.floor(tempoDeJogo % 60).toString().padStart(2, "0");
+    textoCronometro.textContent = `${minutos}:${segundos}`;
 
-  if (tempoProximaOnda <= 0) {
-    gerarOndaRaposa();
-    tempoProximaOnda =
-      Math.random() * (configOndas.intervaloMax - configOndas.intervaloMin) +
-      configOndas.intervaloMin;
-  }
+    tempoProximaOnda -= deltaTempo;
 
-  atualizarRaposaAnimada(raposa, rotaEsquerda, deltaTempo);
-  atualizarRaposaAnimada(raposaDireita, rotaDireita, deltaTempo);
+    if (tempoProximaOnda <= 0) {
+      gerarOndaRaposa();
+      tempoProximaOnda =
+        Math.random() * (configOndas.intervaloMax - configOndas.intervaloMin) +
+        configOndas.intervaloMin;
+    }
 
-  for (let i = 0; i < raposasEmOnda.length; i++) {
-    atualizarRaposaEmOnda(raposasEmOnda[i], deltaTempo);
+    atualizarRaposaAnimada(raposa, rotaEsquerda, deltaTempo);
+    atualizarRaposaAnimada(raposaDireita, rotaDireita, deltaTempo);
+
+    for (let i = 0; i < raposasEmOnda.length; i++) {
+      atualizarRaposaEmOnda(raposasEmOnda[i], deltaTempo);
+    }
+
+    atualizarAtaquesDasTorres(deltaTempo);
   }
 
   renderizar();
