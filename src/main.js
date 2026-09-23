@@ -37,12 +37,17 @@ const VELOCIDADE_OVO_PIXELS = 390;
 const RAIO_IMPACTO_OVO_PIXELS = 25;
 const DURACAO_ANIMACAO_TIRO = 0.48;
 
-let audioContexto = null;
-let ganhoMusica = null;
-let timerMusica = null;
-let passoMusica = 0;
 let musicaLigada = true;
 let volumeMusica = 0.45;
+const musicaMenu = new Audio("assets/audio/musica-menu.mp3");
+const musicaInicioPartida = new Audio("assets/audio/inicio-partida.mp3");
+const musicaTemaPartida = new Audio("assets/audio/tema-partida.m4a");
+const todasAsMusicas = [musicaMenu, musicaInicioPartida, musicaTemaPartida];
+let musicaAtivaDaPartida = null;
+
+musicaMenu.loop = true;
+musicaTemaPartida.loop = true;
+for (const musica of todasAsMusicas) musica.preload = "auto";
 
 try {
   const preferencias = JSON.parse(localStorage.getItem("galinhas-config") || "{}");
@@ -63,44 +68,72 @@ function atualizarControlesMusica() {
   statusMusica.textContent = musicaLigada ? "Ligada" : "Muda";
   valorVolume.textContent = `${Math.round(volumeMusica * 100)}%`;
   controleVolume.disabled = !musicaLigada;
-  if (ganhoMusica) {
-    ganhoMusica.gain.setTargetAtTime(musicaLigada ? volumeMusica * 0.12 : 0, audioContexto.currentTime, 0.04);
+  for (const musica of todasAsMusicas) {
+    musica.volume = volumeMusica;
+    musica.muted = !musicaLigada;
   }
 }
 
-function tocarNota(frequencia, duracao = 0.18) {
-  if (!audioContexto || !ganhoMusica || !musicaLigada) return;
-  const oscilador = audioContexto.createOscillator();
-  const ganhoNota = audioContexto.createGain();
-  oscilador.type = "square";
-  oscilador.frequency.value = frequencia;
-  ganhoNota.gain.setValueAtTime(0.0001, audioContexto.currentTime);
-  ganhoNota.gain.exponentialRampToValueAtTime(0.32, audioContexto.currentTime + 0.015);
-  ganhoNota.gain.exponentialRampToValueAtTime(0.0001, audioContexto.currentTime + duracao);
-  oscilador.connect(ganhoNota).connect(ganhoMusica);
-  oscilador.start();
-  oscilador.stop(audioContexto.currentTime + duracao + 0.02);
+function reproduzirMusica(musica) {
+  musica.play().catch(() => {
+    // Navegadores podem bloquear áudio antes da primeira interação do jogador.
+  });
 }
 
-function iniciarMusica() {
-  if (!audioContexto) {
-    audioContexto = new AudioContext();
-    ganhoMusica = audioContexto.createGain();
-    ganhoMusica.connect(audioContexto.destination);
-  }
-  audioContexto.resume();
-  atualizarControlesMusica();
-  if (timerMusica) return;
-  const melodia = [261.63, 329.63, 392.0, 329.63, 293.66, 349.23, 440.0, 349.23];
-  timerMusica = setInterval(() => {
-    tocarNota(melodia[passoMusica % melodia.length]);
-    passoMusica++;
-  }, 380);
+function reiniciarFaixa(musica) {
+  musica.pause();
+  try {
+    musica.currentTime = 0;
+  } catch {}
 }
+
+function tocarMusicaDoMenu() {
+  musicaInicioPartida.pause();
+  musicaTemaPartida.pause();
+  reproduzirMusica(musicaMenu);
+}
+
+function iniciarAudioDaPartida() {
+  musicaMenu.pause();
+  reiniciarFaixa(musicaInicioPartida);
+  reiniciarFaixa(musicaTemaPartida);
+  musicaAtivaDaPartida = musicaInicioPartida;
+  reproduzirMusica(musicaInicioPartida);
+}
+
+function pausarAudioDaPartida() {
+  musicaInicioPartida.pause();
+  musicaTemaPartida.pause();
+  reproduzirMusica(musicaMenu);
+}
+
+function retomarAudioDaPartida() {
+  musicaMenu.pause();
+  if (musicaAtivaDaPartida === musicaInicioPartida && musicaInicioPartida.ended) {
+    musicaAtivaDaPartida = musicaTemaPartida;
+  }
+  if (!musicaAtivaDaPartida) musicaAtivaDaPartida = musicaTemaPartida;
+  reproduzirMusica(musicaAtivaDaPartida);
+}
+
+function reiniciarAudioParaMenu() {
+  reiniciarFaixa(musicaInicioPartida);
+  reiniciarFaixa(musicaTemaPartida);
+  musicaAtivaDaPartida = null;
+  tocarMusicaDoMenu();
+}
+
+musicaInicioPartida.addEventListener("ended", () => {
+  if (musicaAtivaDaPartida !== musicaInicioPartida) return;
+  musicaAtivaDaPartida = musicaTemaPartida;
+  musicaTemaPartida.currentTime = 0;
+  if (jogoIniciado) reproduzirMusica(musicaTemaPartida);
+});
 
 function abrirMenu(menu) {
   jogoIniciado = false;
   cancelarPosicionamentoTorre();
+  tocarMusicaDoMenu();
   menuPrincipal.classList.add("is-hidden");
   menuPausa.classList.add("is-hidden");
   menuCreditos.classList.toggle("is-hidden", menu !== "credits");
@@ -110,6 +143,7 @@ function abrirMenu(menu) {
 function voltarAoMenuPrincipal() {
   jogoIniciado = false;
   cancelarPosicionamentoTorre();
+  tocarMusicaDoMenu();
   menuCreditos.classList.add("is-hidden");
   menuConfiguracoes.classList.add("is-hidden");
   menuPausa.classList.add("is-hidden");
@@ -118,7 +152,6 @@ function voltarAoMenuPrincipal() {
 }
 
 function mostrarJogo() {
-  iniciarMusica();
   jogoIniciado = true;
   canvas.classList.remove("is-blurred");
   menuPrincipal.classList.add("is-hidden");
@@ -132,6 +165,7 @@ function mostrarJogo() {
 
 function pausarJogo() {
   jogoIniciado = false;
+  pausarAudioDaPartida();
   canvas.classList.add("is-blurred");
   cancelarPosicionamentoTorre();
   menuPrincipal.classList.add("is-hidden");
@@ -144,6 +178,7 @@ function pausarJogo() {
 }
 
 function reiniciarParaMenuPrincipal() {
+  reiniciarAudioParaMenu();
   tempoDeJogo = 0;
   textoCronometro.textContent = "00:00";
   torresGalinha.length = 0;
@@ -178,9 +213,15 @@ function reiniciarParaMenuPrincipal() {
   botaoSair.hidden = true;
 }
 
-botaoIniciar.addEventListener("click", mostrarJogo);
+botaoIniciar.addEventListener("click", () => {
+  iniciarAudioDaPartida();
+  mostrarJogo();
+});
 botaoSair.addEventListener("click", pausarJogo);
-botaoContinuar.addEventListener("click", mostrarJogo);
+botaoContinuar.addEventListener("click", () => {
+  mostrarJogo();
+  retomarAudioDaPartida();
+});
 botaoReiniciar.addEventListener("click", reiniciarParaMenuPrincipal);
 
 // FUNCIONALIDADES PARA BOTÃO GALINHA -----------------------------------------------
@@ -351,7 +392,6 @@ botaoGalinha.addEventListener("pointercancel", cancelarPosicionamentoTorre);
 
 document.querySelectorAll("[data-open-menu]").forEach((botao) => {
   botao.addEventListener("click", () => {
-    iniciarMusica();
     abrirMenu(botao.dataset.openMenu);
   });
 });
@@ -361,8 +401,11 @@ document.querySelectorAll("[data-back-menu]").forEach((botao) => {
 
 controleMusica.addEventListener("change", () => {
   musicaLigada = controleMusica.checked;
-  if (musicaLigada) iniciarMusica();
   atualizarControlesMusica();
+  if (musicaLigada) {
+    if (jogoIniciado) retomarAudioDaPartida();
+    else tocarMusicaDoMenu();
+  }
   salvarConfiguracoes();
 });
 
@@ -373,6 +416,7 @@ controleVolume.addEventListener("input", () => {
 });
 
 atualizarControlesMusica();
+tocarMusicaDoMenu();
 
 const gl = canvas.getContext("webgl2"); // "API" web gl
 
@@ -690,7 +734,7 @@ function desenharTorresGalinha() {
     const v2 = (32 - pixelY) / 32;
     const meiaAlturaGalinha = 0.056;
     const meiaLarguraGalinha = meiaAlturaGalinha / (canvas.width / canvas.height);
-    const centroYGalinha = torre.y + 0.181;
+    const centroYGalinha = torre.y + 0.16;
     desenharRetanguloTexturizado(
       torre.x - meiaLarguraGalinha,
       centroYGalinha - meiaAlturaGalinha,
@@ -1081,7 +1125,7 @@ function atualizarAtaquesDasTorres(deltaTempo) {
     ) {
       ovosDisparados.push({
         x: torre.x - 0.025,
-        y: torre.y + 0.185,
+        y: torre.y + 0.145,
         alvo: torre.alvoDoTiro,
         frame: 0,
         tempoAnimacao: 0,
