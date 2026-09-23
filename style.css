@@ -374,7 +374,6 @@ button:focus-visible {
   image-rendering: pixelated;
   clip-path: none;
 }
-
 /* BOTÃO DA GALINHA*/
 .controles_button {
   background: url("assets/img/chickenbutton.jpg") center / 100% 100% no-repeat;

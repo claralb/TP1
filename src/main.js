@@ -9,11 +9,14 @@ const menuCreditos = document.getElementById("credits-menu");
 const menuConfiguracoes = document.getElementById("settings-menu");
 const botaoIniciar = document.getElementById("start-game");
 const botaoSair = document.getElementById("exit-game");
+const botaoGalinha = document.getElementById("chicken-button");
 const controleMusica = document.getElementById("music-enabled");
 const controleVolume = document.getElementById("music-volume");
 const statusMusica = document.getElementById("music-status");
 const valorVolume = document.getElementById("volume-value");
 let jogoIniciado = false;
+let colocandoTorre = false;
+const torresGalinha = [];
 
 let audioContexto = null;
 let ganhoMusica = null;
@@ -108,6 +111,34 @@ function mostrarMenu() {
 
 botaoIniciar.addEventListener("click", mostrarJogo);
 botaoSair.addEventListener("click", mostrarMenu);
+
+// FUNCIONALIDADES PARA BOTÃO GALINHA -----------------------------------------------
+botaoGalinha.addEventListener("click", () => {
+  colocandoTorre = true;
+  botaoGalinha.setAttribute("aria-pressed", "true");
+});
+
+canvas.addEventListener("click", (evento) => {
+  
+  const areaCanvas = canvas.getBoundingClientRect(); //função pronta que retorna as dimensões do canvas na tela
+  const x = ((evento.clientX - areaCanvas.left) / areaCanvas.width) * 2 - 1;
+  const y = 1 - ((evento.clientY - areaCanvas.top) / areaCanvas.height) * 2;
+
+  const meiaAltura = 0.12;
+  const meiaLargura = meiaAltura / (canvas.width / canvas.height);
+
+  // Controla a posição para a torre não sair da tela.
+  const novaTorre = {x: Math.max(-1 + meiaLargura, Math.min(1 - meiaLargura, x)),y: Math.max(-1 + meiaAltura, Math.min(1 - meiaAltura, y)),};
+
+  // impede que o espaço ocupado por uma torre se sobreponha a outra
+  const torreSobreposta = torresGalinha.some((torre) => Math.abs(torre.x - novaTorre.x) < meiaLargura * 2.5 && Math.abs(torre.y - novaTorre.y) < meiaAltura * 2.5);
+
+  //se a conficao de torresobreposta for falsa, adiciona nova torre
+  if (!torreSobreposta) {
+    torresGalinha.push(novaTorre);
+  }
+})
+
 document.querySelectorAll("[data-open-menu]").forEach((botao) => {
   botao.addEventListener("click", () => {
     iniciarMusica();
@@ -311,6 +342,10 @@ const texturaGalinheiro = carregarTextura(
   "assets/img/Galinheiro.png"
 );
 
+const texturaTorreGalinha = carregarTextura(
+  "assets/img/torreGalinha.png"
+);
+
 const texturaCaminho = carregarTextura(
   "assets/img/Path_Middle.png",
   true
@@ -400,6 +435,21 @@ function desenharRetanguloTexturizado(
   gl.uniform1i(removeFundo, removerFundo ? 1 : 0);
 
   gl.drawArrays(gl.TRIANGLES, 0, 6);
+}
+
+function desenharTorresGalinha() {
+  const meiaAltura = 0.25;
+  const meiaLargura = meiaAltura / (canvas.width / canvas.height);
+
+  for (const torre of torresGalinha) {
+    desenharRetanguloTexturizado(
+      torre.x - meiaLargura,
+      torre.y - meiaAltura,
+      torre.x + meiaLargura,
+      torre.y + meiaAltura,
+      texturaTorreGalinha
+    );
+  }
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -920,6 +970,8 @@ function renderizar() {
     16
   );
 
+  desenharTorresGalinha();
+
   desenharRaposaAnimada(raposa);
   desenharRaposaAnimada(raposaDireita);
 
@@ -935,7 +987,7 @@ function renderizar() {
     0.18,
     0.42,
     texturaGalinheiro
-  );
+  );  const meiaAltura = 0.18;
 }
 
 // ----------------------------------------------------------
