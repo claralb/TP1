@@ -13,6 +13,7 @@ const botaoContinuar = document.getElementById("continue-game");
 const botaoReiniciar = document.getElementById("restart-game");
 const botaoSair = document.getElementById("exit-game");
 const botaoGalinha = document.getElementById("chicken-button");
+const textoRecargaTorre = document.getElementById("tower-cooldown");
 const cronometro = document.getElementById("game-timer");
 const textoCronometro = document.getElementById("game-time");
 const controleMusica = document.getElementById("music-enabled");
@@ -27,6 +28,7 @@ const ovosDisparados = [];
 let previewTorre = null;
 let ponteiroTorre = null;
 let inicioArrasteTorre = null;
+let tempoRecargaTorre = 0;
 
 const TORRE_MEIA_ALTURA = 0.25;
 const TORRE_MEIA_LARGURA = TORRE_MEIA_ALTURA / (canvas.width / canvas.height);
@@ -36,6 +38,7 @@ const INTERVALO_TIRO_TORRE = 1.15;
 const VELOCIDADE_OVO_PIXELS = 390;
 const RAIO_IMPACTO_OVO_PIXELS = 25;
 const DURACAO_ANIMACAO_TIRO = 0.48;
+const INTERVALO_COLOCACAO_TORRE = 30;
 const VIDA_RAPOSA = 6;
 const DANO_OVO = 1;
 const INTERVALO_INICIAL_RAPOSAS = 2.5;
@@ -187,6 +190,8 @@ function reiniciarParaMenuPrincipal() {
   textoCronometro.textContent = "00:00";
   torresGalinha.length = 0;
   ovosDisparados.length = 0;
+  tempoRecargaTorre = 0;
+  atualizarDisponibilidadeTorre();
   raposasEmOnda.length = 0;
   tempoProximaOnda = configOndas.atrasoInicial;
   proximoLadoEsquerdo = true;
@@ -366,8 +371,21 @@ function cancelarPosicionamentoTorre() {
   botaoGalinha.removeAttribute("aria-pressed");
 }
 
+function atualizarDisponibilidadeTorre() {
+  const recarregando = tempoRecargaTorre > 0;
+  botaoGalinha.disabled = recarregando;
+  textoRecargaTorre.hidden = !recarregando;
+  textoRecargaTorre.textContent = recarregando ? Math.ceil(tempoRecargaTorre) : "";
+  botaoGalinha.setAttribute(
+    "aria-label",
+    recarregando
+      ? `Nova torre disponível em ${Math.ceil(tempoRecargaTorre)} segundos`
+      : "Arraste para posicionar uma torre de galinha",
+  );
+}
+
 botaoGalinha.addEventListener("pointerdown", (evento) => {
-  if (!jogoIniciado || evento.button !== 0) return;
+  if (!jogoIniciado || tempoRecargaTorre > 0 || evento.button !== 0) return;
   evento.preventDefault();
   colocandoTorre = true;
   ponteiroTorre = evento.pointerId;
@@ -393,6 +411,8 @@ botaoGalinha.addEventListener("pointerup", (evento) => {
       tempoAteTiro: 0.15,
       animacaoTiro: 0,
     });
+    tempoRecargaTorre = INTERVALO_COLOCACAO_TORRE;
+    atualizarDisponibilidadeTorre();
   }
   cancelarPosicionamentoTorre();
 });
@@ -1490,6 +1510,10 @@ function loop(tempoAtual) {
 
   if (jogoIniciado) {
     tempoDeJogo += deltaTempo;
+    if (tempoRecargaTorre > 0) {
+      tempoRecargaTorre = Math.max(0, tempoRecargaTorre - deltaTempo);
+      atualizarDisponibilidadeTorre();
+    }
     const minutos = Math.floor(tempoDeJogo / 60).toString().padStart(2, "0");
     const segundos = Math.floor(tempoDeJogo % 60).toString().padStart(2, "0");
     textoCronometro.textContent = `${minutos}:${segundos}`;

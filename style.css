@@ -424,6 +424,7 @@ button:focus-visible {
 }
 /* BOTÃO DA GALINHA*/
 .controles_button {
+  position: relative;
   background: url("assets/img/chickenbutton.jpg") center / 100% 100% no-repeat;
 }
 
@@ -432,6 +433,27 @@ button:focus-visible {
   filter: none;
   transform: none;
   box-shadow: none;
+}
+
+.controles_button:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.55) brightness(0.65);
+}
+
+#tower-cooldown {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff1c9;
+  background: rgb(58 33 24 / 72%);
+  font: 900 clamp(16px, 1.6vw, 23px)/1 "Courier New", monospace;
+  text-shadow: 2px 2px 0 #24130d;
+  pointer-events: none;
+}
+
+#tower-cooldown[hidden] {
+  display: none;
 }
 
 #exit-game {
