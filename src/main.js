@@ -36,6 +36,10 @@ const INTERVALO_TIRO_TORRE = 1.15;
 const VELOCIDADE_OVO_PIXELS = 390;
 const RAIO_IMPACTO_OVO_PIXELS = 25;
 const DURACAO_ANIMACAO_TIRO = 0.48;
+const VIDA_RAPOSA = 6;
+const DANO_OVO = 1;
+const INTERVALO_INICIAL_RAPOSAS = 2.5;
+const INTERVALO_MINIMO_RAPOSAS = 0.5;
 
 let musicaLigada = true;
 let volumeMusica = 0.45;
@@ -185,6 +189,7 @@ function reiniciarParaMenuPrincipal() {
   ovosDisparados.length = 0;
   raposasEmOnda.length = 0;
   tempoProximaOnda = configOndas.atrasoInicial;
+  proximoLadoEsquerdo = true;
 
   Object.assign(raposa, {
     indicePonto: 0,
@@ -194,6 +199,8 @@ function reiniciarParaMenuPrincipal() {
     tempoAnimacao: 0,
     frameAtual: 0,
     olhandoParaDireita: true,
+    vida: VIDA_RAPOSA,
+    ativa: true,
   });
   Object.assign(raposaDireita, {
     indicePonto: 0,
@@ -203,6 +210,8 @@ function reiniciarParaMenuPrincipal() {
     tempoAnimacao: 0,
     frameAtual: 0,
     olhandoParaDireita: false,
+    vida: VIDA_RAPOSA,
+    ativa: true,
   });
 
   jogoIniciado = false;
@@ -1014,8 +1023,15 @@ const configSpriteRaposa = {
 };
 
 
-// configuração das ondas de raposas 
-const configOndas = {intervaloMin: 2.5, intervaloMax: 6.0, quantidadeMin: 1, quantidadeMax: 3, atrasoInicial: .2};
+// A frequência aumenta com o tempo, mas a resistência das raposas não muda.
+const configOndas = { atrasoInicial: 0.2 };
+
+function intervaloEntreRaposas(tempoDecorrido) {
+  return Math.max(
+    INTERVALO_MINIMO_RAPOSAS,
+    INTERVALO_INICIAL_RAPOSAS * Math.pow(0.88, tempoDecorrido / 30),
+  );
+}
 
 const raposa = {
   indicePonto: 0,
@@ -1027,6 +1043,8 @@ const raposa = {
   tempoAnimacao: 0,
   frameAtual: 0,
   olhandoParaDireita: true,
+  vida: VIDA_RAPOSA,
+  ativa: true,
 };
 
 const raposaDireita = {
@@ -1039,50 +1057,84 @@ const raposaDireita = {
   tempoAnimacao: 0,
   frameAtual: 0,
   olhandoParaDireita: false,
+  vida: VIDA_RAPOSA,
+  ativa: true,
 };
 
 //vetor que guarda raposas 
 const raposasEmOnda = []; 
 let tempoProximaOnda = configOndas.atrasoInicial;
+let proximoLadoEsquerdo = true;
 //cria as ondas de raposas
-function criarRaposaEmOnda(rota, lado, atrasoAbertura = 0) {
+function criarRaposaEmOnda(rota, lado) {
   return {rota, //rota que a raposa vai seguir
     indicePonto: 0, //qual ponto da rota a raposa está
     progresso: 0, //quanto ja foi percorrido
-    velocidade: 0.08 + Math.random() * 0.06, //velocidade da raposa eh um pouco aleatória
+    velocidade: 0.10,
     x: rota[0].x,
     y: rota[0].y,
     tamanhoY: 0.20,
     tempoAnimacao: Math.random() * 2, //evita que elas fiquem sincronizadas
     frameAtual: 0,
     ativa: true, //pode criar novas raposas
-    atrasoAbertura,
+    vida: VIDA_RAPOSA,
+    lado,
   };
 }
 
-//gera ondas de raposas para os dois lados
+// Cria uma raposa por vez, alternando os dois caminhos.
 function gerarOndaRaposa() {
-  const qtdEsquerda = Math.floor(Math.random() * (configOndas.quantidadeMax - configOndas.quantidadeMin + 1)) + configOndas.quantidadeMin;
-
-  const qtdDireita = Math.floor(Math.random() * (configOndas.quantidadeMax - configOndas.quantidadeMin + 1)) + configOndas.quantidadeMin;
-  const atrasoEntreRaposas = 0.45;
-
-  for (let i = 0; i < qtdEsquerda; i++) {
-    raposasEmOnda.push(criarRaposaEmOnda(rotaEsquerda, "esquerda", i * atrasoEntreRaposas));
-  }
-
-  for (let i = 0; i < qtdDireita; i++) {
-    raposasEmOnda.push(criarRaposaEmOnda(rotaDireita, "direita", i * atrasoEntreRaposas));
-  }
+  const rota = proximoLadoEsquerdo ? rotaEsquerda : rotaDireita;
+  const lado = proximoLadoEsquerdo ? "esquerda" : "direita";
+  raposasEmOnda.push(criarRaposaEmOnda(rota, lado));
+  proximoLadoEsquerdo = !proximoLadoEsquerdo;
 }
 
 function raposasDisponiveisComoAlvo() {
   return [
-    raposa,
-    raposaDireita,
-    ...raposasEmOnda.filter((raposaAtual) => raposaAtual.ativa !== false),
+    ...(raposa.ativa ? [raposa] : []),
+    ...(raposaDireita.ativa ? [raposaDireita] : []),
+    ...raposasEmOnda.filter((raposaAtual) => raposaAtual.ativa),
   ];
 }
+
+function causarDanoRaposa(raposaAtual, dano = DANO_OVO) {
+  if (!raposaAtual?.ativa) return;
+  raposaAtual.vida -= dano;
+  if (raposaAtual.vida <= 0) {
+    raposaAtual.ativa = false;
+  }
+}
+
+function removerRaposasDerrotadas() {
+  for (let i = raposasEmOnda.length - 1; i >= 0; i--) {
+    if (!raposasEmOnda[i].ativa) {
+      raposasEmOnda.splice(i, 1);
+    }
+  }
+}
+
+canvas.addEventListener("click", (evento) => {
+  if (!jogoIniciado || colocandoTorre) return;
+
+  const area = canvas.getBoundingClientRect();
+  const xClique = ((evento.clientX - area.left) / area.width) * 2 - 1;
+  const yClique = 1 - ((evento.clientY - area.top) / area.height) * 2;
+  const alvos = raposasDisponiveisComoAlvo().reverse();
+
+  for (const raposaAtual of alvos) {
+    const meiaAlturaPixels = raposaAtual.tamanhoY * area.height / 4;
+    const meiaLarguraPixels = meiaAlturaPixels;
+    const distanciaX = Math.abs(raposaAtual.x - xClique) * area.width / 2;
+    const distanciaY = Math.abs(raposaAtual.y - yClique) * area.height / 2;
+
+    if (distanciaX <= meiaLarguraPixels && distanciaY <= meiaAlturaPixels) {
+      causarDanoRaposa(raposaAtual);
+      removerRaposasDerrotadas();
+      break;
+    }
+  }
+});
 
 function raposaMaisProxima(torre) {
   const origemY = torre.y + 0.19;
@@ -1149,6 +1201,7 @@ function atualizarAtaquesDasTorres(deltaTempo) {
     const deslocamentoPixels = VELOCIDADE_OVO_PIXELS * deltaTempo;
 
     if (distanciaPixels <= RAIO_IMPACTO_OVO_PIXELS + deslocamentoPixels) {
+      causarDanoRaposa(ovo.alvo);
       ovosDisparados.splice(i, 1);
       continue;
     }
@@ -1159,9 +1212,12 @@ function atualizarAtaquesDasTorres(deltaTempo) {
     ovo.tempoAnimacao += deltaTempo;
     ovo.frame = Math.floor(ovo.tempoAnimacao * 12) % 4;
   }
+
+  removerRaposasDerrotadas();
 }
 
 function atualizarRaposaEmOnda(raposaAtual, deltaTempo) {
+  if (!raposaAtual.ativa) return;
   raposaAtual.tempoAnimacao += deltaTempo; //soma o tempo no cont da animação
   const frameCalculado = Math.floor(raposaAtual.tempoAnimacao * configSpriteRaposa.fpsAnimacao);
   raposaAtual.frameAtual = frameCalculado % configSpriteRaposa.totalFrames;
@@ -1206,6 +1262,7 @@ function atualizarRaposaEmOnda(raposaAtual, deltaTempo) {
 
 //desenha a raposa em onda 
 function desenharRaposaEmOnda(raposaAtual) {
+  if (!raposaAtual.ativa) return;
 
   const cfg = configSpriteRaposa;
   const pixelX = raposaAtual.frameAtual * cfg.larguraFrame;
@@ -1240,7 +1297,7 @@ function desenharRaposaEmOnda(raposaAtual) {
 }
 
 function atualizarRaposaAnimada(raposaAtual, rota, deltaTempo) {
-  if (!raposaAtual || !rota || rota.length < 2) return;
+  if (!raposaAtual || !raposaAtual.ativa || !rota || rota.length < 2) return;
 
   raposaAtual.tempoAnimacao += deltaTempo;
   const frameCalculado = Math.floor(raposaAtual.tempoAnimacao * configSpriteRaposa.fpsAnimacao);
@@ -1285,6 +1342,8 @@ function atualizarRaposaAnimada(raposaAtual, rota, deltaTempo) {
 }
 
 function desenharRaposaAnimada(raposaAtual) {
+  if (!raposaAtual.ativa) return;
+
   const cfg = configSpriteRaposa;
 
   const pixelX = raposaAtual.frameAtual * cfg.larguraFrame;
@@ -1439,9 +1498,7 @@ function loop(tempoAtual) {
 
     if (tempoProximaOnda <= 0) {
       gerarOndaRaposa();
-      tempoProximaOnda =
-        Math.random() * (configOndas.intervaloMax - configOndas.intervaloMin) +
-        configOndas.intervaloMin;
+      tempoProximaOnda = intervaloEntreRaposas(tempoDeJogo);
     }
 
     atualizarRaposaAnimada(raposa, rotaEsquerda, deltaTempo);
