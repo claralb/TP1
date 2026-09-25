@@ -4,6 +4,8 @@ if (!canvas) {
   throw new Error("Canvas não encontrado");
 }
 
+
+// MENU E BOTÕES
 const menuPrincipal = document.getElementById("main-menu");
 const menuCreditos = document.getElementById("credits-menu");
 const menuConfiguracoes = document.getElementById("settings-menu");
@@ -30,6 +32,9 @@ let ponteiroTorre = null;
 let inicioArrasteTorre = null;
 let tempoRecargaTorre = 0;
 
+const botaoTentarNovamente = document.getElementById("bt-reiniciar");
+
+
 const TORRE_MEIA_ALTURA = 0.25;
 const TORRE_MEIA_LARGURA = TORRE_MEIA_ALTURA / (canvas.width / canvas.height);
 const CAMINHO_ESPESSURA = 0.06;
@@ -44,11 +49,14 @@ const DANO_OVO = 1;
 const INTERVALO_INICIAL_RAPOSAS = 2.5;
 const INTERVALO_MINIMO_RAPOSAS = 0.5;
 
+const menuGameOver = document.getElementById("game-over");
+
 let musicaLigada = true;
-let volumeMusica = 0.45;
+let volumeMusica = 0.25;
 const musicaMenu = new Audio("assets/audio/musica-menu.mp3");
 const musicaInicioPartida = new Audio("assets/audio/inicio-partida.mp3");
 const musicaTemaPartida = new Audio("assets/audio/tema-partida.m4a");
+const somGameOver = new Audio("assets/audio/morteGalinha.mp3");
 const todasAsMusicas = [musicaMenu, musicaInicioPartida, musicaTemaPartida];
 let musicaAtivaDaPartida = null;
 
@@ -196,6 +204,14 @@ function reiniciarParaMenuPrincipal() {
   tempoProximaOnda = configOndas.atrasoInicial;
   proximoLadoEsquerdo = true;
 
+  //resstaura a barra de vida
+  vida.vidaAtual = vida.vidaMax;
+  vida.frameAtual = 0;
+
+  // esconde o menu de Game Over
+  menuGameOver.classList.add("is-hidden");
+  menuGameOver.hidden = true;
+
   Object.assign(raposa, {
     indicePonto: 0,
     progresso: 0,
@@ -227,6 +243,9 @@ function reiniciarParaMenuPrincipal() {
   botaoSair.hidden = true;
 }
 
+
+document.getElementById("bt-reiniciar")?.addEventListener("click", reiniciarParaMenuPrincipal);
+
 botaoIniciar.addEventListener("click", () => {
   iniciarAudioDaPartida();
   mostrarJogo();
@@ -236,21 +255,23 @@ botaoContinuar.addEventListener("click", () => {
   mostrarJogo();
   retomarAudioDaPartida();
 });
-botaoReiniciar.addEventListener("click", reiniciarParaMenuPrincipal);
+botaoReiniciar.addEventListener("click", menuPrincipal);
 
 // FUNCIONALIDADES PARA BOTÃO GALINHA -----------------------------------------------
 function posicaoCanvasDoPonteiro(evento) {
+  //area do canvas
   const area = canvas.getBoundingClientRect();
-  const dentro = evento.clientX >= area.left && evento.clientX <= area.right &&
-    evento.clientY >= area.top && evento.clientY <= area.bottom;
+  //verifica se o ponteiro está no canvas
+  const dentro = evento.clientX >= area.left && evento.clientX <= area.right && evento.clientY >= area.top && evento.clientY <= area.bottom;
   const x = ((evento.clientX - area.left) / area.width) * 2 - 1;
   const y = 1 - ((evento.clientY - area.top) / area.height) * 2;
-  return {
+  return { //limita os valores 
     x: Math.max(-1 + TORRE_MEIA_LARGURA, Math.min(1 - TORRE_MEIA_LARGURA, x)),
     y: Math.max(-1 + TORRE_MEIA_ALTURA, Math.min(1 - TORRE_MEIA_ALTURA, y)),
     dentro,
   };
 }
+
 
 function segmentoInterceptaRetangulo(a, b, esquerda, direita, topo, baixo) {
   let tMin = 0;
@@ -461,6 +482,7 @@ gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 // -------------------------------------------------------------------
 // SHADERS: VERTEX E FRAGMENT
 
+//tudo padrão de vertex e fragment
 const vertexShaderSource = `#version 300 es
 in vec2 a_coord;
 in vec2 a_texCoord;
@@ -543,13 +565,13 @@ const usaTextura = gl.getUniformLocation(programa, "u_usaTextura");
 const textura = gl.getUniformLocation(programa, "u_textura");  
 const removeFundo = gl.getUniformLocation(programa, "u_removeFundo");
 
-const buffer = gl.createBuffer();
+const vbo = gl.createBuffer();
 
-if (!buffer) {
+if (!vbo) {
   throw new Error("Não foi possível criar o buffer de vértices");
 }
 
-gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
 
 // -----------------------------------------------------------------------------------------------------------
 //CARREGA UMA TEXTURA
@@ -649,6 +671,9 @@ const texturaEnfeites = carregarTextura(
 //RAPOSA SPRING SHEET
 const texturaRaposa = carregarTextura("assets/img/fox.png");
 
+// VIDA SPRING SHEET
+const texturaVida = carregarTextura("assets/img/lifeBar.png");
+
 // -----------------------------------------------------
 //FUNÇÕES DO DESENHO BÁSICO
 
@@ -695,7 +720,7 @@ function desenharRetanguloTexturizado(
     x2, y2, u2, v2,
   ]);
 
-  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+  gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
   gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
 
   gl.useProgram(programa);
@@ -963,7 +988,7 @@ function desenharCaminho(waypoints) {
 
   const vertices = new Float32Array(dadosVertices);
 
-  gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+  gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
   gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
   gl.useProgram(programa);
 
@@ -1039,6 +1064,16 @@ const configSpriteRaposa = {
   alturaFrame: 32,
   linhaAnimacao: 3,
   totalFrames: 8,
+  fpsAnimacao: 10,
+};
+
+// configuração do sprite da vida
+const configSpriteVida = {
+  larguraSheet: 64,
+  alturaSheet: 160,
+  larguraFrame: 40,
+  alturaFrame: 31,
+  totalFrames: 6,
   fpsAnimacao: 10,
 };
 
@@ -1316,6 +1351,47 @@ function desenharRaposaEmOnda(raposaAtual) {
   );
 }
 
+const vida = {
+  x: 0.5,
+  y: 0.5,
+
+  frameAtual: 0,
+  vidaMax: 5,
+  vidaAtual: 5, //verifica quando ainda tem para saber que tem que mudar 
+
+};
+
+function gameOver(){
+  jogoIniciado = false;
+  canvas.classList.add("is-blurred");
+
+  musicaTemaPartida.pause();
+  reproduzirMusica(somGameOver);
+
+  cronometro.hidden = true;
+  botaoGalinha.hidden = true;
+  botaoSair.hidden = true;
+
+  menuPrincipal.classList.add("is-hidden");
+  menuPausa.classList.add("is-hidden");
+  menuCreditos.classList.add("is-hidden");
+  menuConfiguracoes.classList.add("is-hidden");
+
+  menuGameOver.classList.remove("is-hidden");
+  menuGameOver.hidden = false;
+}
+
+function danoChickenCoop (dano = 1){
+  vida.vidaAtual = Math.max(0, vida.vidaAtual - dano);
+
+  const porcentagem = vida.vidaAtual/vida.vidaMax;
+ // vida.frameAtual = Math.floor((1 - porcentagem) * configSpriteVida.totalFrames); //impede que um sprit que nao existe seja lido 
+  vida.frameAtual = Math.min(configSpriteVida.totalFrames - 1, Math.floor((1 - porcentagem) * configSpriteVida.totalFrames));
+    if(vida.vidaAtual <= 0){
+      gameOver();
+    }
+}
+
 function atualizarRaposaAnimada(raposaAtual, rota, deltaTempo) {
   if (!raposaAtual || !raposaAtual.ativa || !rota || rota.length < 2) return;
 
@@ -1323,10 +1399,17 @@ function atualizarRaposaAnimada(raposaAtual, rota, deltaTempo) {
   const frameCalculado = Math.floor(raposaAtual.tempoAnimacao * configSpriteRaposa.fpsAnimacao);
   raposaAtual.frameAtual = frameCalculado % configSpriteRaposa.totalFrames;
 
+  //adicionado para remover as raposas que atacam o chickencoop
   if (raposaAtual.indicePonto >= rota.length - 1) {
-    raposaAtual.indicePonto = 0;
-    raposaAtual.progresso = 0;
+    danoChickenCoop(1);
+
+    const indice = raposasEmOnda.indexOf(raposaAtual);
+    if (indice != -1){
+    raposasEmOnda.splice(indice, 1);
+    }
+    return; //para nao continuar nessa função e acabar por mover a raposa removida 
   }
+
 
   const pAtual = rota[raposaAtual.indicePonto];
   const pProx = rota[Math.min(raposaAtual.indicePonto + 1, rota.length - 1)];
@@ -1393,6 +1476,27 @@ function desenharRaposaAnimada(raposaAtual) {
     v1,
     u2,
     v2,
+    false
+  );
+}
+
+function desenharVida(){
+  const cfg = configSpriteVida;
+
+  //posicao em pixels dentro do spritsheet
+  const pixelX = 0;
+  const pixelY = vida.frameAtual * cfg.alturaFrame;
+
+  const u1 = 0;
+  const u2 = 1;
+
+  const v1 = (cfg.alturaSheet - (pixelY + cfg.alturaFrame)) / cfg.alturaSheet;
+  const v2 = (cfg.alturaSheet - pixelY) / cfg.alturaSheet;
+
+
+  //retangulo padrao para colocar a textura
+  desenharRetanguloTexturizado(
+    -0.16, 0.44, 0.16, 0.52, texturaVida, u1, v1, u2, v2,
     false
   );
 }
@@ -1479,8 +1583,9 @@ function renderizar() {
 
   desenharTorresGalinha();
 
-  desenharRaposaAnimada(raposa);
-  desenharRaposaAnimada(raposaDireita);
+  //tirar os desenhos fixos estao atrapalhando
+  //desenharRaposaAnimada(raposa);
+  //desenharRaposaAnimada(raposaDireita);
 
   for (const raposaAtual of raposasEmOnda) {
     desenharRaposaEmOnda(raposaAtual);
@@ -1497,7 +1602,11 @@ function renderizar() {
     0.42,
     texturaGalinheiro
   );  const meiaAltura = 0.18;
+
+  desenharVida();
 }
+
+
 
 // ----------------------------------------------------------
 // LOOP DA ANIMAÇÃO
@@ -1525,16 +1634,28 @@ function loop(tempoAtual) {
       tempoProximaOnda = intervaloEntreRaposas(tempoDeJogo);
     }
 
-    atualizarRaposaAnimada(raposa, rotaEsquerda, deltaTempo);
-    atualizarRaposaAnimada(raposaDireita, rotaDireita, deltaTempo);
 
-    for (let i = 0; i < raposasEmOnda.length; i++) {
-      atualizarRaposaEmOnda(raposasEmOnda[i], deltaTempo);
+   //atualizarRaposaAnimada(raposa, rotaEsquerda, deltaTempo);
+    //atualizarRaposaAnimada(raposaDireita, rotaDireita, deltaTempo);
+
+      //alteraçao do for 
+    for (let i = raposasEmOnda.length - 1; i >= 0; i--) {
+      const raposaAtual = raposasEmOnda[i];
+  
+    if (raposaAtual.indicePonto >= raposaAtual.rota.length - 1) {
+      danoChickenCoop(1); //  dano uma única vez
+      raposasEmOnda.splice(i, 1); // apaga a raposa da lista
+      continue;
     }
 
-    atualizarAtaquesDasTorres(deltaTempo);
+    atualizarRaposaEmOnda(raposaAtual, deltaTempo);
+    
   }
 
+  atualizarAtaquesDasTorres(deltaTempo);
+
+  }
+  
   renderizar();
   requestAnimationFrame(loop);
 }

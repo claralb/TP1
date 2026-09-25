@@ -57,6 +57,41 @@ canvas.is-blurred {
   transition: opacity 220ms ease, visibility 220ms ease;
 }
 
+.menu-fim {
+  position: absolute;
+  inset: 0;
+  z-index: 10; /* Superior a todos os outros menus e controlos */
+  display: grid;
+  place-items: center;
+  padding: clamp(20px, 5vw, 64px);
+  background:
+    repeating-linear-gradient(
+      0deg,
+      #10251014 0,
+      #10251014 3px,
+      transparent 3px,
+      transparent 6px
+    ),
+    #1025107a;
+  pointer-events: auto; /* Força receção de cliques */
+}
+
+.menu-def {
+  position: relative;
+  width: min(520px, 82%);
+  padding: clamp(12px, 2vw, 26px) clamp(16px, 3vw, 38px) clamp(18px, 2.5vw, 34px);
+  text-align: center;
+  border-style: solid;
+  border-width: clamp(44px, 5vw, 64px) clamp(21px, 2.5vw, 34px) clamp(25px, 3vw, 40px);
+  border-image-source: url("assets/img/menu-board.png");
+  border-image-slice: 30 10 13 10 fill;
+  border-image-width: 1;
+  border-image-repeat: stretch;
+  background: transparent;
+  image-rendering: pixelated;
+}
+
+
 #main-menu.is-hidden,
 .secondary-menu.is-hidden {
   opacity: 0;
@@ -64,7 +99,7 @@ canvas.is-blurred {
   pointer-events: none;
 }
 
-.menu-card {
+.menu-card{
   position: relative;
   width: min(520px, 82%);
   padding: clamp(12px, 2vw, 26px) clamp(16px, 3vw, 38px) clamp(18px, 2.5vw, 34px);
@@ -160,6 +195,20 @@ canvas.is-blurred {
   padding: 17px 24px;
 }
 
+.titulo-fim {
+  margin: 12px 0 24px;
+  color: #ff5555;
+  font-family: "Courier New", monospace;
+  font-size: clamp(30px, 4vw, 52px);
+  font-weight: 900;
+  line-height: 1;
+  text-transform: uppercase;
+  text-shadow:
+    4px 0 #431717,
+    0 4px #431717,
+    4px 4px #431717;
+}
+
 button {
   border: 0;
   border-radius: 0;
@@ -199,6 +248,13 @@ button:hover {
     inset 0 -4px #bd692e,
     0 8px 0 #673a24,
     0 12px 0 #111b12;
+}
+
+#bt-reiniciar {
+  position: relative;
+  z-index: 11;
+  pointer-events: auto;
+  cursor: pointer;
 }
 
 button:active {
