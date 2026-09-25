@@ -652,7 +652,7 @@ const texturaEnfeites = carregarTextura(
 const texturaRaposa = carregarTextura("assets/img/fox.png");
 
 // VIDA SPRING SHEET
-const texturaVida = carregarTextura("assets/img/vidaFox.png");
+const texturaVida = carregarTextura("assets/img/lifeBar.png");
 
 // -----------------------------------------------------
 //FUNÇÕES DO DESENHO BÁSICO
@@ -1049,12 +1049,11 @@ const configSpriteRaposa = {
 
 // configuração do sprite da vida
 const configSpriteVida = {
-  larguraSheet: 784,
-  alturaSheet: 500,
-  larguraFrame: 64,
-  alturaFrame: 16,
-  linhaAnimacao: 11,
-  totalFrames: 4,
+  larguraSheet: 64,
+  alturaSheet: 160,
+  larguraFrame: 40,
+  alturaFrame: 31,
+  totalFrames: 6,
   fpsAnimacao: 10,
 };
 
@@ -1337,8 +1336,8 @@ const vida = {
   y: 0.5,
 
   frameAtual: 0,
-  vidaMax: 100,
-  vidaAtual: 100, //verifica quando ainda tem para saber que tem que mudar 
+  vidaMax: 5,
+  vidaAtual: 5, //verifica quando ainda tem para saber que tem que mudar 
 
 };
 
@@ -1465,13 +1464,15 @@ function desenharVida(){
   const cfg = configSpriteVida;
 
   //posicao em pixels dentro do spritsheet
-  const pixelX = vida.frameAtual * cfg.larguraFrame;
-  const pixelY = cfg.linhaAnimacao * cfg.alturaFrame;
+  const pixelX = 0;
+  const pixelY = vida.frameAtual * cfg.alturaFrame;
 
-  const u1 = pixelX / cfg.larguraSheet;
-  const u2 = (pixelX + cfg.larguraFrame) / cfg.larguraSheet;
+  const u1 = 0;
+  const u2 = 1;
+
   const v1 = (cfg.alturaSheet - (pixelY + cfg.alturaFrame)) / cfg.alturaSheet;
   const v2 = (cfg.alturaSheet - pixelY) / cfg.alturaSheet;
+
 
   //retangulo padrao para colocar a textura
   desenharRetanguloTexturizado(
@@ -1562,8 +1563,9 @@ function renderizar() {
 
   desenharTorresGalinha();
 
-  desenharRaposaAnimada(raposa);
-  desenharRaposaAnimada(raposaDireita);
+  //tirar os desenhos fixos estao atrapalhando
+  //desenharRaposaAnimada(raposa);
+  //desenharRaposaAnimada(raposaDireita);
 
   for (const raposaAtual of raposasEmOnda) {
     desenharRaposaEmOnda(raposaAtual);
@@ -1608,16 +1610,28 @@ function loop(tempoAtual) {
       tempoProximaOnda = intervaloEntreRaposas(tempoDeJogo);
     }
 
-   atualizarRaposaAnimada(raposa, rotaEsquerda, deltaTempo);
-    atualizarRaposaAnimada(raposaDireita, rotaDireita, deltaTempo);
 
-    for (let i = 0; i < raposasEmOnda.length; i++) {
-      atualizarRaposaEmOnda(raposasEmOnda[i], deltaTempo);
+   //atualizarRaposaAnimada(raposa, rotaEsquerda, deltaTempo);
+    //atualizarRaposaAnimada(raposaDireita, rotaDireita, deltaTempo);
+
+      //alteraçao do for 
+    for (let i = raposasEmOnda.length - 1; i >= 0; i--) {
+      const raposaAtual = raposasEmOnda[i];
+  
+    if (raposaAtual.indicePonto >= raposaAtual.rota.length - 1) {
+      danoChickenCoop(1); //  dano uma única vez
+      raposasEmOnda.splice(i, 1); // apaga a raposa da lista
+      continue;
     }
 
-    atualizarAtaquesDasTorres(deltaTempo);
+    atualizarRaposaEmOnda(raposaAtual, deltaTempo);
+    
   }
 
+  atualizarAtaquesDasTorres(deltaTempo);
+
+  }
+  
   renderizar();
   requestAnimationFrame(loop);
 }
