@@ -53,6 +53,7 @@ let volumeMusica = 0.25;
 const musicaMenu = new Audio("assets/audio/musica-menu.mp3");
 const musicaInicioPartida = new Audio("assets/audio/inicio-partida.mp3");
 const musicaTemaPartida = new Audio("assets/audio/tema-partida.m4a");
+const somGameOver = new Audio("assets/audio/morteGalinha.mp3");
 const todasAsMusicas = [musicaMenu, musicaInicioPartida, musicaTemaPartida];
 let musicaAtivaDaPartida = null;
 
@@ -1344,6 +1345,9 @@ const vida = {
 function gameOver(){
   jogoIniciado = false;
   canvas.classList.add("is-blurred");
+
+  musicaTemaPartida.pause();
+  reproduzirMusica(somGameOver);
 
   cronometro.hidden = true;
   botaoGalinha.hidden = true;
