@@ -1362,8 +1362,8 @@ function danoChickenCoop (dano = 1){
   vida.vidaAtual = Math.max(0, vida.vidaAtual - dano);
 
   const porcentagem = vida.vidaAtual/vida.vidaMax;
-  vida.frameAtual = Math.floor((1 - porcentagem) * configSpriteVida.totalFrames); //impede que um sprit que nao existe seja lido 
-
+ // vida.frameAtual = Math.floor((1 - porcentagem) * configSpriteVida.totalFrames); //impede que um sprit que nao existe seja lido 
+  vida.frameAtual = Math.min(configSpriteVida.totalFrames - 1, Math.floor((1 - porcentagem) * configSpriteVida.totalFrames));
     if(vida.vidaAtual <= 0){
       gameOver();
     }
