@@ -22,6 +22,8 @@ const controleMusica = document.getElementById("music-enabled");
 const controleVolume = document.getElementById("music-volume");
 const statusMusica = document.getElementById("music-status");
 const valorVolume = document.getElementById("volume-value");
+const pontosJogador = document.getElementById("game-score");
+
 let jogoIniciado = false;
 let tempoDeJogo = 0;
 let colocandoTorre = false;
@@ -31,6 +33,8 @@ let previewTorre = null;
 let ponteiroTorre = null;
 let inicioArrasteTorre = null;
 let tempoRecargaTorre = 0;
+
+
 
 const botaoTentarNovamente = document.getElementById("bt-reiniciar");
 
@@ -59,6 +63,10 @@ const musicaTemaPartida = new Audio("assets/audio/tema-partida.m4a");
 const somGameOver = new Audio("assets/audio/morteGalinha.mp3");
 const todasAsMusicas = [musicaMenu, musicaInicioPartida, musicaTemaPartida];
 let musicaAtivaDaPartida = null;
+
+//PONTUAÇÃO
+const textoPontuacao = document.getElementById("game-score");
+let pontuacao = 0;
 
 musicaMenu.loop = true;
 musicaTemaPartida.loop = true;
@@ -153,6 +161,7 @@ function abrirMenu(menu) {
   menuPausa.classList.add("is-hidden");
   menuCreditos.classList.toggle("is-hidden", menu !== "credits");
   menuConfiguracoes.classList.toggle("is-hidden", menu !== "settings");
+  pontosJogador.hidden = true; //problema se resolveu com isso  
 }
 
 function voltarAoMenuPrincipal() {
@@ -174,6 +183,7 @@ function mostrarJogo() {
   menuConfiguracoes.classList.add("is-hidden");
   menuPausa.classList.add("is-hidden");
   cronometro.hidden = false;
+  pontosJogador.hidden = false;
   botaoGalinha.hidden = false;
   botaoSair.hidden = false;
 }
@@ -190,6 +200,7 @@ function pausarJogo() {
   cronometro.hidden = true;
   botaoGalinha.hidden = true;
   botaoSair.hidden = true;
+  pontosJogador.hidden = true;
 }
 
 function reiniciarParaMenuPrincipal() {
@@ -204,6 +215,9 @@ function reiniciarParaMenuPrincipal() {
   tempoProximaOnda = configOndas.atrasoInicial;
   proximoLadoEsquerdo = true;
 
+  pontuacao = 0;
+  textoPontuacao.textContent = "0";
+
   //resstaura a barra de vida
   vida.vidaAtual = vida.vidaMax;
   vida.frameAtual = 0;
@@ -211,6 +225,7 @@ function reiniciarParaMenuPrincipal() {
   // esconde o menu de Game Over
   menuGameOver.classList.add("is-hidden");
   menuGameOver.hidden = true;
+  pontosJogador.hidden = true;
 
   Object.assign(raposa, {
     indicePonto: 0,
@@ -1042,6 +1057,7 @@ function desenharRecorteAtlas(
     true
   );
 }
+// MODELO IDEIA 
 //   // Preenche o chão com tijolos até o final do canvas
 // percorrer todo o desenhar caminho com tijolos
 //   for (let y = FLOOR_Y + 57; y < canvas.height + 32; y += 64) {
@@ -1079,8 +1095,10 @@ const configSpriteVida = {
 
 
 // A frequência aumenta com o tempo, mas a resistência das raposas não muda.
-const configOndas = { atrasoInicial: 0.2 };
+const configOndas = { atrasoInicial: 0.2};
 
+
+// por hora deixa de ser usada 
 function intervaloEntreRaposas(tempoDecorrido) {
   return Math.max(
     INTERVALO_MINIMO_RAPOSAS,
@@ -1120,6 +1138,7 @@ const raposaDireita = {
 const raposasEmOnda = []; 
 let tempoProximaOnda = configOndas.atrasoInicial;
 let proximoLadoEsquerdo = true;
+
 //cria as ondas de raposas
 function criarRaposaEmOnda(rota, lado) {
   return {rota, //rota que a raposa vai seguir
@@ -1158,6 +1177,10 @@ function causarDanoRaposa(raposaAtual, dano = DANO_OVO) {
   raposaAtual.vida -= dano;
   if (raposaAtual.vida <= 0) {
     raposaAtual.ativa = false;
+
+    //a cada raposinha morta adiciona um ponto
+    pontuacao++;
+    textoPontuacao.textContent = pontuacao;
   }
 }
 
@@ -1371,6 +1394,7 @@ function gameOver(){
   cronometro.hidden = true;
   botaoGalinha.hidden = true;
   botaoSair.hidden = true;
+  pontosJogador.hidden = true;
 
   menuPrincipal.classList.add("is-hidden");
   menuPausa.classList.add("is-hidden");
@@ -1626,15 +1650,13 @@ function loop(tempoAtual) {
     const minutos = Math.floor(tempoDeJogo / 60).toString().padStart(2, "0");
     const segundos = Math.floor(tempoDeJogo % 60).toString().padStart(2, "0");
     textoCronometro.textContent = `${minutos}:${segundos}`;
+//tempo ate a proxima onda
+ tempoProximaOnda -= deltaTempo;
 
-    tempoProximaOnda -= deltaTempo;
-
-    if (tempoProximaOnda <= 0) {
-      gerarOndaRaposa();
-      tempoProximaOnda = intervaloEntreRaposas(tempoDeJogo);
-    }
-
-
+if (tempoProximaOnda <= 0) {
+    gerarOndaRaposa();
+    tempoProximaOnda = intervaloEntreRaposas(tempoDeJogo);
+}
    //atualizarRaposaAnimada(raposa, rotaEsquerda, deltaTempo);
     //atualizarRaposaAnimada(raposaDireita, rotaDireita, deltaTempo);
 
